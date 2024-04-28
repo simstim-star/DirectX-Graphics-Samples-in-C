@@ -2,13 +2,13 @@
 
 #include "sample.h"
 #include "sample_commons.h"
-#include "macros.h"
 #include "window.h"
 #include "d3dcompiler.h"
-#include "barrier_helpers.h"
-#include "core_helpers.h"
-#include "root_signature_helpers.h"
-#include "resource_helpers.h"
+#include "dxheaders/d3dx12_macros.h"
+#include "dxheaders/d3dx12c_barriers.h"
+#include "dxheaders/d3dx12c_core.h"
+#include "dxheaders/d3dx12c_root_signature.h"
+#include "dxheaders/d3dx12c_resource_helpers.h"
 
 /*************************************************************************************
  Local constants

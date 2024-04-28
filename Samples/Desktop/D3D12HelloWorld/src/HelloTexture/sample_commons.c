@@ -1,8 +1,8 @@
 #include <stdio.h>
-#include "sample_commons.h"
-#include "macros.h"
 #include "d3d12.h"
 #include <dxgi1_6.h>
+#include "sample_commons.h"
+#include "dxheaders/d3dx12_macros.h"
 
 void ExitIfFailed(const HRESULT hr)
 {

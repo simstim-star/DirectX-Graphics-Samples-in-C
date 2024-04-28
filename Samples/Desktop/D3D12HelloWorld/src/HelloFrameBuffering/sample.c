@@ -2,11 +2,11 @@
 
 #include "sample.h"
 #include "sample_commons.h"
-#include "macros.h"
 #include "window.h"
 #include "d3dcompiler.h"
-#include "barrier_helpers.h"
-#include "core_helpers.h"
+#include "dxheaders/d3dx12c_barriers.h"
+#include "dxheaders/d3dx12c_core.h"
+#include "dxheaders/d3dx12_macros.h"
 
 /*************************************************************************************
  Forward declarations of private functions

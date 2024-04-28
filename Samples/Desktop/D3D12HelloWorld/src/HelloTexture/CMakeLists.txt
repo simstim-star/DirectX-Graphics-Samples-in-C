@@ -7,7 +7,7 @@ project(HelloTexture LANGUAGES C)
 
 set(CMAKE_C_STANDARD 17)
 set(SOURCE_FILES main.c sample.c sample_commons.c window.c)
-set(HEADER_FILES sample.h sample_commons.h barrier_helpers.h window.h core_helpers.h macros.h root_signature_helpers.h resource_helpers.h)
+set(HEADER_FILES sample.h sample_commons.h window.h)
 set(SHADER_FILES shaders/shaders.hlsl)
 set(ALL_PROJECT_FILES ${SOURCE_FILES} ${HEADER_FILES} ${SHADER_FILES})
 set_source_files_properties(${SHADER_FILES} PROPERTIES LANGUAGE HLSL)
