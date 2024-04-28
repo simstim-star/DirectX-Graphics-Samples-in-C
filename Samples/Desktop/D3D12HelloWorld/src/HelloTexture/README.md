@@ -20,3 +20,7 @@ You can also build with GCC:
 ```
 cc -mwindows *.c -ldxgi -ld3dcompiler -ld3d12 -ldxguid
 ```
+
+## Result
+![image](https://github.com/simstim-star/DirectX-Graphics-Samples-in-C/assets/167698401/77156f18-fbc9-486d-8cf3-5f7f1b5d424d)
+
