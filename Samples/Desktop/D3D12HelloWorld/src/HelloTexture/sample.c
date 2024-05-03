@@ -162,7 +162,7 @@ static void LoadPipeline(DXSample* const sample)
 		ExitIfFailed(CALL(CreateDescriptorHeap, sample->device, &srvHeapDesc, IID_PPV_ARGS(&sample->srvHeap)));
 	}
 
-	/* Create frame resources on the descriptor heaps above */
+	/* Create frame resource views on the RTVs heaps above */
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
 		CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvHandle);
@@ -317,9 +317,7 @@ static void LoadAssets(DXSample* const sample)
 			IID_PPV_ARGS(&sample->vertexBuffer))
 		);
 
-		// We will open the vertexBuffer memory (that is in the GPU) for the CPU to write the triangle data 
-		// in it. To do that, we use the Map() function, which enables the CPU to read from or write 
-		// to the vertex buffer's memory directly
+		// A CPU pointer to the vertexBuffer data.
 		UINT8* pVertexDataBegin = NULL; // UINT8 to represent byte-level manipulation
 		// We do not intend to read from this resource on the CPU, only write
 		const D3D12_RANGE readRange = (D3D12_RANGE){ .Begin = 0, .End = 0 };
@@ -329,16 +327,15 @@ static void LoadAssets(DXSample* const sample)
 		// the buffer is mapped.
 		CALL(Unmap, sample->vertexBuffer, 0, NULL);
 
-		// Initialize the vertex buffer view
+		// Initialize the vertex buffer view. Note how the resource is accessible from both the CPU and the GPU
 		sample->vertexBufferView.BufferLocation = CALL(GetGPUVirtualAddress, sample->vertexBuffer);
 		sample->vertexBufferView.StrideInBytes = sizeof(Vertex);
 		sample->vertexBufferView.SizeInBytes = vertexBufferSize;
 	}
 
-	// Note: The resource below is a CPU object but it needs to stay in scope until
-	// the command list that references it has finished executing on the GPU.
-	// We will flush the GPU at the end of this method to ensure the resource is not
-	// prematurely destroyed.
+	// Note: The resource below needs to stay in scope until the command list that references it 
+	// has finished executing on the GPU. We will flush the GPU at the end of this method to ensure 
+	// the resource is not prematurely destroyed.
 	ID3D12Resource *textureUploadHeap = NULL;
 
 	/*
