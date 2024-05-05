@@ -15,10 +15,12 @@ This will generate a folder called `build-msvc` with the Visual Studio Solution 
 
 You can run it to see the image below:
 
+![image](https://github.com/simstim-star/DirectX-Graphics-Samples-in-C/assets/167698401/a2dc2081-c2f9-46ba-a271-355a354128b5)
+
 
 ## How to build (GCC)
 
-You can also build with GCC. You can get the files in nuget.org/packages/Microsoft.Direct3D.D3D12/1.613.1 and nuget.org/packages/Microsoft.Direct3D.VideoAccelerationCompatibilityPack/1.0.0 with NuGet.
+You can also build with GCC. You can get the files in https://nuget.org/packages/Microsoft.Direct3D.D3D12/1.613.1 and https://nuget.org/packages/Microsoft.Direct3D.VideoAccelerationCompatibilityPack/1.0.0 with NuGet.
 
 ```
 cc -mwindows *.c -ldxgi -ld3dcompiler -ldxguid -ld3d12 -lva -lva_win32 \
