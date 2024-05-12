@@ -1,0 +1,1 @@
+Generic Programs require a device with shader model 6.8 support. Currently, I only have 6.6 available. I will update once I get a device with 6.8 support.
