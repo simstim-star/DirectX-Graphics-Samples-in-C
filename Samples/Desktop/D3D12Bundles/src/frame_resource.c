@@ -21,7 +21,7 @@ static void SetCityPositions(FrameResource* fr, FLOAT intervalX, FLOAT intervalZ
     }
 }
 
-void FrameResource_Init(FrameResource* fr, ID3D12Device* pDevice, UINT cityRowCount, UINT cityColumnCount){
+void FrameResource_Init(FrameResource* fr, ID3D12Device* device, UINT cityRowCount, UINT cityColumnCount){
     fr->fenceValue = 0;
     fr->cityRowCount = cityRowCount;
     fr->cityColumnCount = cityColumnCount;
@@ -32,13 +32,13 @@ void FrameResource_Init(FrameResource* fr, ID3D12Device* pDevice, UINT cityRowCo
     // resource needs a command allocator because command allocators 
     // cannot be reused until the GPU is done executing the commands 
     // associated with it.
-    ExitIfFailed(CALL(CreateCommandAllocator, pDevice, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&fr->commandAllocator)));
-    ExitIfFailed(CALL(CreateCommandAllocator, pDevice, D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&fr->bundleAllocator)));
+    ExitIfFailed(CALL(CreateCommandAllocator, device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&fr->commandAllocator)));
+    ExitIfFailed(CALL(CreateCommandAllocator, device, D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&fr->bundleAllocator)));
 
     D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
     D3D12_RESOURCE_DESC uploadBuffer = CD3DX12_RESOURCE_DESC_BUFFER(sizeof(SceneConstantBuffer) * fr->cityRowCount * fr->cityColumnCount, D3D12_RESOURCE_FLAG_NONE, 0);
     // Create an upload heap for the constant buffers.
-    ExitIfFailed(CALL(CreateCommittedResource, pDevice, 
+    ExitIfFailed(CALL(CreateCommittedResource, device, 
         &uploadHeap,
         D3D12_HEAP_FLAG_NONE,
         &uploadBuffer,

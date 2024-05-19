@@ -126,6 +126,7 @@ void Sample_Render(DXSample* const sample)
 	// Present and update the frame index for the next frame.
 	ExitIfFailed(CALL(Present, sample->swapChain, 1, 0));
 	sample->frameIndex = CALL(GetCurrentBackBufferIndex, sample->swapChain);
+
 	// Signal and increment the fence value.
 	sample->currFrameResource->fenceValue = sample->fenceValue;
 	ExitIfFailed(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
@@ -269,7 +270,8 @@ static void LoadAssets(DXSample* const sample)
 
 	/* Create root signature */
 	{
-		// This is the highest version the sample supports. If CheckFeatureSupport succeeds, the HighestVersion returned will not be greater than this.
+		// This is the highest version the sample supports. 
+		// If CheckFeatureSupport succeeds, the HighestVersion returned will not be greater than this.
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = { .HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1 };
 		if (FAILED(CALL(CheckFeatureSupport, sample->device, D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 		{
@@ -369,7 +371,13 @@ static void LoadAssets(DXSample* const sample)
 
 	/* Create the command list */
 
-	ExitIfFailed(CALL(CreateCommandList, sample->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, sample->commandAllocator, NULL, IID_PPV_ARGS(&sample->commandList)));
+	ExitIfFailed(CALL(CreateCommandList, sample->device, 
+		0, 
+		D3D12_COMMAND_LIST_TYPE_DIRECT, 
+		sample->commandAllocator, 
+		NULL, 
+		IID_PPV_ARGS(&sample->commandList))
+	);
 	NAME_D3D12_OBJECT(sample->commandList);
 
 	// Create render target views (RTVs).
@@ -387,11 +395,7 @@ static void LoadAssets(DXSample* const sample)
 	// Read in mesh data for vertex/index buffers.
 	UINT8* pMeshData;
 	UINT meshDataLength;
-	WCHAR currPath[512];
-	GetCurrentPath(currPath, _countof(currPath));
-	wcscat(currPath, SampleAssets_DATA_FILE_NAME);
-	ExitIfFailed(ReadDataFromFile(currPath, &pMeshData, &meshDataLength));
-
+	LoadShaderData(sample->assetsPath, SampleAssets_DATA_FILE_NAME, &pMeshData, &meshDataLength);
 	// Create the vertex buffer.
 	{
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -435,8 +439,6 @@ static void LoadAssets(DXSample* const sample)
 		sample->vertexBufferView.BufferLocation = CALL(GetGPUVirtualAddress, sample->vertexBuffer);
 		sample->vertexBufferView.StrideInBytes = SampleAssets_STANDARD_VERTEX_STRIDE;
 		sample->vertexBufferView.SizeInBytes = SampleAssets_VERTEX_DATA_SIZE;
-
-		sample->numIndices = SampleAssets_INDEX_DATA_SIZE / 4;    // R32_UINT (SampleAssets_StandardIndexFormat) = 4 bytes each.
 	}
 
 	// Create the index buffer.
@@ -584,7 +586,8 @@ static void LoadAssets(DXSample* const sample)
 			.DepthStencil.Stencil = 0,
 		};
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		D3D12_RESOURCE_DESC texDesc = CD3DX12_TEX2D(DXGI_FORMAT_D32_FLOAT, sample->width, sample->height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
+		D3D12_RESOURCE_DESC texDesc = CD3DX12_TEX2D(DXGI_FORMAT_D32_FLOAT, sample->width, sample->height, 1, 0, 1, 0, 
+			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
 		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,

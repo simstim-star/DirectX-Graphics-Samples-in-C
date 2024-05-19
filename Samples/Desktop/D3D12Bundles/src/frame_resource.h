@@ -33,35 +33,35 @@ typedef struct FrameResource
     UINT cityColumnCount;
 } FrameResource;
 
-void FrameResource_Init(FrameResource *fr, ID3D12Device* pDevice, UINT cityRowCount, UINT cityColumnCount);
+void FrameResource_Init(FrameResource *fr, ID3D12Device* device, UINT cityRowCount, UINT cityColumnCount);
 void FrameResource_Clean(FrameResource* fr);
 
 void FrameResource_InitBundle(FrameResource* fr,
-    ID3D12Device* pDevice, 
-    ID3D12PipelineState* pPso1, 
-    ID3D12PipelineState* pPso2,
+    ID3D12Device* device, 
+    ID3D12PipelineState* pso1, 
+    ID3D12PipelineState* pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* pIndexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* pVertexBufferViewDesc,
-    ID3D12DescriptorHeap* pCbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
+    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
+    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* pSamplerDescriptorHeap, 
-    ID3D12RootSignature* pRootSignature
+    ID3D12DescriptorHeap* samplerDescriptorHeap, 
+    ID3D12RootSignature* rootSignature
 );
 
 void FrameResource_PopulateCommandList(FrameResource* fr,
-    ID3D12GraphicsCommandList* pCommandList, 
-    ID3D12PipelineState* pPso1, 
-    ID3D12PipelineState* pPso2,
+    ID3D12GraphicsCommandList* commandList, 
+    ID3D12PipelineState* pso1, 
+    ID3D12PipelineState* pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* pIndexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* pVertexBufferViewDesc,
-    ID3D12DescriptorHeap* pCbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
+    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
+    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* pSamplerDescriptorHeap, 
-    ID3D12RootSignature* pRootSignature
+    ID3D12DescriptorHeap* samplerDescriptorHeap, 
+    ID3D12RootSignature* rootSignature
 );
 
 void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* fr, FXMMATRIX view, CXMMATRIX projection);
