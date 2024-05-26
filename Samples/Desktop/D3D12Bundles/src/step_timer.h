@@ -68,20 +68,16 @@ inline void TickWithUpdateFn(StepTimer* st, LPUPDATEFUNC update)
 {
     // Query the current time.
     LARGE_INTEGER currentTime;
-
     QueryPerformanceCounter(&currentTime);
-
+    // Update delta since last call
     UINT64 timeDelta = currentTime.QuadPart - st->qpcLastTime.QuadPart;
-
     st->qpcLastTime = currentTime;
     st->qpcSecondCounter += timeDelta;
-
     // Clamp excessively large time deltas (e.g. after paused in the debugger).
     if (timeDelta > st->qpcMaxDelta)
     {
         timeDelta = st->qpcMaxDelta;
     }
-
     // Convert QPC units into a canonical tick format. This cannot overflow due to the previous clamp.
     timeDelta *= TicksPerSecond;
     timeDelta /= st->qpcFrequency.QuadPart;
@@ -98,19 +94,22 @@ inline void TickWithUpdateFn(StepTimer* st, LPUPDATEFUNC update)
         // fixed update, running with vsync enabled on a 59.94 NTSC display, would eventually
         // accumulate enough tiny errors that it would drop a frame. It is better to just round 
         // small deviations down to zero to leave things running smoothly.
-
         if (abs((int)(timeDelta - st->targetElapsedTicks)) < TicksPerSecond / 4000)
         {
             timeDelta = st->targetElapsedTicks;
         }
-
+        // Add to the leftover. If the accumulated leftover passes a certain target, we will need to take some actions to
+        // ensure that the time step is still fixed.  
         st->leftOverTicks += timeDelta;
 
+        // This will be done every time the leftover reaches the target. In case it has reached the target exaclty, it will do what
+        // is expected: just step with the target. If it surpases, we will still step with target, but we will also register a leftover
+        // that will propagate to the next tick (this leftover will be the difference timeDelta - target)
         while (st->leftOverTicks >= st->targetElapsedTicks)
         {
             st->elapsedTicks = st->targetElapsedTicks;
             st->totalTicks += st->targetElapsedTicks;
-            st->leftOverTicks -= st->targetElapsedTicks;
+            st->leftOverTicks -= st->targetElapsedTicks; // will be zero if st->leftOverTicks == st->targetElapsedTicks
             st->frameCount++;
 
             if (update)
@@ -147,4 +146,5 @@ inline void TickWithUpdateFn(StepTimer* st, LPUPDATEFUNC update)
     }
 }
 
+// Only updates timer state, but doesn't do anything else
 inline void Tick(StepTimer* st) { TickWithUpdateFn(st, NULL); }

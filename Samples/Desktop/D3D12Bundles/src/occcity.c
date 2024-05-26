@@ -12,8 +12,3 @@ SampleAssets_TextureResource SampleAssets_Textures[] =
 {
 	{ 1024, 1024, 1, DXGI_FORMAT_BC1_UNORM, { { 0, 524288, 2048 }, } }, // city.dds
 };
-
-SampleAssets_DrawParameters SampleAssets_Draws[] =
-{
-	{ 0, -1, -1, 0, 18642, 0 },
-};

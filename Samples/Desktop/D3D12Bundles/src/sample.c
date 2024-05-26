@@ -54,11 +54,8 @@ void Sample_Destroy(DXSample* const sample)
 	{
 		const UINT64 fenceValue = sample->fenceValue;
 		const UINT64 lastCompletedFence = CALL(GetCompletedValue, sample->fence);
-
 		// Signal and increment the fence value.
 		ExitIfFailed(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
-		sample->fenceValue++;
-
 		// Wait until the previous frame is finished.
 		if (lastCompletedFence < fenceValue)
 		{
@@ -79,7 +76,7 @@ void Sample_Destroy(DXSample* const sample)
 void Sample_Update(DXSample* const sample) {
 	Tick(&sample->timer);
 
-	if (sample->frameCounter == 500)
+	if (sample->frameCounter == 50)
 	{
 		// Update window text with FPS value.
 		wchar_t fps[64];
@@ -332,7 +329,10 @@ static void LoadAssets(DXSample* const sample)
 
 		// Describe and create the graphics pipeline state objects (PSO).
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
-			.InputLayout = { SampleAssets_StandardVertexDescription, SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS },
+			.InputLayout = { 
+				.pInputElementDescs = SampleAssets_StandardVertexDescription, 
+			    .NumElements = SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS 
+		     },
 			.pRootSignature = sample->rootSignature,
 			.VS = (D3D12_SHADER_BYTECODE){
 				.pShaderBytecode = pVertexShaderData,

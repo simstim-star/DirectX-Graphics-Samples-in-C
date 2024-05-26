@@ -38,4 +38,3 @@ typedef struct SampleAssets_DrawParameters
 
 extern const D3D12_INPUT_ELEMENT_DESC SampleAssets_StandardVertexDescription[SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS];
 extern SampleAssets_TextureResource SampleAssets_Textures[1];
-extern SampleAssets_DrawParameters SampleAssets_Draws[1];

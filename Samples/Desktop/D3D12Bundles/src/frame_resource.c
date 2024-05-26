@@ -60,53 +60,53 @@ void FrameResource_Init(FrameResource* fr, ID3D12Device* device, UINT cityRowCou
 }
 
 void FrameResource_InitBundle(FrameResource* fr,
-    ID3D12Device* pDevice, 
-    ID3D12PipelineState* pPso1, 
-    ID3D12PipelineState* pPso2,
+    ID3D12Device* device, 
+    ID3D12PipelineState* pso1, 
+    ID3D12PipelineState* pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* pIndexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* pVertexBufferViewDesc,
-    ID3D12DescriptorHeap* pCbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
+    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
+    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* pSamplerDescriptorHeap, 
-    ID3D12RootSignature* pRootSignature)
+    ID3D12DescriptorHeap* samplerDescriptorHeap, 
+    ID3D12RootSignature* rootSignature)
 {
-    ExitIfFailed(CALL(CreateCommandList, pDevice, 0, D3D12_COMMAND_LIST_TYPE_BUNDLE, fr->bundleAllocator, pPso1, IID_PPV_ARGS(&fr->bundle)));
+    ExitIfFailed(CALL(CreateCommandList, device, 0, D3D12_COMMAND_LIST_TYPE_BUNDLE, fr->bundleAllocator, pso1, IID_PPV_ARGS(&fr->bundle)));
     NAME_D3D12_OBJECT(fr->bundle);
-    FrameResource_PopulateCommandList(fr, fr->bundle, pPso1, pPso2, frameResourceIndex, numIndices, pIndexBufferViewDesc,
-        pVertexBufferViewDesc, pCbvSrvDescriptorHeap, cbvSrvDescriptorSize, pSamplerDescriptorHeap, pRootSignature);
+    FrameResource_PopulateCommandList(fr, fr->bundle, pso1, pso2, frameResourceIndex, numIndices, indexBufferViewDesc,
+        vertexBufferViewDesc, cbvSrvDescriptorHeap, cbvSrvDescriptorSize, samplerDescriptorHeap, rootSignature);
     ExitIfFailed(CALL(Close, fr->bundle));
 }
 
 void FrameResource_PopulateCommandList(FrameResource* fr,
-    ID3D12GraphicsCommandList* pCommandList,
-    ID3D12PipelineState* pPso1, 
-    ID3D12PipelineState* pPso2,
+    ID3D12GraphicsCommandList* commandList,
+    ID3D12PipelineState* pso1, 
+    ID3D12PipelineState* pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* pIndexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* pVertexBufferViewDesc,
-    ID3D12DescriptorHeap* pCbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
+    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
+    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* pSamplerDescriptorHeap, 
-    ID3D12RootSignature* pRootSignature)
+    ID3D12DescriptorHeap* samplerDescriptorHeap, 
+    ID3D12RootSignature* rootSignature)
 {
     // If the root signature matches the root signature of the caller, then
     // bindings are inherited, otherwise the bind space is reset.
-    CALL(SetGraphicsRootSignature, pCommandList, pRootSignature);
+    CALL(SetGraphicsRootSignature, commandList, rootSignature);
 
-    ID3D12DescriptorHeap* ppHeaps[] = { pCbvSrvDescriptorHeap, pSamplerDescriptorHeap };
-    CALL(SetDescriptorHeaps, pCommandList, _countof(ppHeaps), ppHeaps);
-    CALL(IASetPrimitiveTopology, pCommandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    CALL(IASetIndexBuffer, pCommandList, pIndexBufferViewDesc);
-    CALL(IASetVertexBuffers, pCommandList, 0, 1, pVertexBufferViewDesc);
+    ID3D12DescriptorHeap* ppHeaps[] = { cbvSrvDescriptorHeap, samplerDescriptorHeap };
+    CALL(SetDescriptorHeaps, commandList, _countof(ppHeaps), ppHeaps);
+    CALL(IASetPrimitiveTopology, commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    CALL(IASetIndexBuffer, commandList, indexBufferViewDesc);
+    CALL(IASetVertexBuffers, commandList, 0, 1, vertexBufferViewDesc);
     D3D12_GPU_DESCRIPTOR_HANDLE cbvSrvHandle;
-    CALL(GetGPUDescriptorHandleForHeapStart, pCbvSrvDescriptorHeap, &cbvSrvHandle);
-    CALL(SetGraphicsRootDescriptorTable, pCommandList, 0, cbvSrvHandle);
+    CALL(GetGPUDescriptorHandleForHeapStart, cbvSrvDescriptorHeap, &cbvSrvHandle);
+    CALL(SetGraphicsRootDescriptorTable, commandList, 0, cbvSrvHandle);
     D3D12_GPU_DESCRIPTOR_HANDLE samplerHandle;
-    CALL(GetGPUDescriptorHandleForHeapStart, pSamplerDescriptorHeap, &samplerHandle);
-    CALL(SetGraphicsRootDescriptorTable, pCommandList, 1, samplerHandle);
+    CALL(GetGPUDescriptorHandleForHeapStart, samplerDescriptorHeap, &samplerHandle);
+    CALL(SetGraphicsRootDescriptorTable, commandList, 1, samplerHandle);
 
     // Calculate the descriptor offset due to multiple frame resources.
     // 1 SRV + how many CBVs we have currently.
@@ -120,12 +120,12 @@ void FrameResource_PopulateCommandList(FrameResource* fr,
         {
             // Alternate which PSO to use; the pixel shader is different on 
             // each just as a PSO setting demonstration.
-            CALL(SetPipelineState, pCommandList, usePso1 ? pPso1 : pPso2);
+            CALL(SetPipelineState, commandList, usePso1 ? pso1 : pso2);
             usePso1 = !usePso1;
             // Set this city's CBV table and move to the next descriptor.
-            CALL(SetGraphicsRootDescriptorTable, pCommandList, 2, cbvSrvHandle);
+            CALL(SetGraphicsRootDescriptorTable, commandList, 2, cbvSrvHandle);
             cbvSrvHandle.ptr = (UINT64)((INT64)cbvSrvHandle.ptr + (INT64)cbvSrvDescriptorSize);
-            CALL(DrawIndexedInstanced, pCommandList, numIndices, 1, 0, 0, 0);
+            CALL(DrawIndexedInstanced, commandList, numIndices, 1, 0, 0, 0);
         }
     }
 }
