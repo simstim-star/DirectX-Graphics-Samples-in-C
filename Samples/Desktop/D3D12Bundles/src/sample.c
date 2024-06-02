@@ -586,8 +586,8 @@ static void LoadAssets(DXSample* const sample)
 			.DepthStencil.Stencil = 0,
 		};
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		D3D12_RESOURCE_DESC texDesc = CD3DX12_TEX2D(DXGI_FORMAT_D32_FLOAT, sample->width, sample->height, 1, 0, 1, 0, 
-			D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
+		D3D12_RESOURCE_DESC texDesc = CD3DX12_TEX2D(DXGI_FORMAT_D32_FLOAT, sample->width, sample->height, 
+			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
 		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
@@ -671,9 +671,10 @@ static void PopulateCommandList(DXSample* const sample)
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CALL(ResourceBarrier, sample->commandList, 1, &transitionBarrierRT);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvCPUHandle, dsvCPUHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvCPUHandle;
 	CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvCPUHandle);
 	rtvCPUHandle.ptr = (SIZE_T)((INT64)rtvCPUHandle.ptr + ((INT64)sample->frameIndex) * ((INT64)sample->rtvDescriptorSize));
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvCPUHandle;
 	CALL(GetCPUDescriptorHandleForHeapStart, sample->dsvHeap, &dsvCPUHandle);
 	CALL(OMSetRenderTargets, sample->commandList, 1, &rtvCPUHandle, FALSE, &dsvCPUHandle);
 
