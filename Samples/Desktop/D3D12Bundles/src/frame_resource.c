@@ -142,8 +142,8 @@ void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* fr, FXMMATRI
             model = XMLoadFloat4x4(&fr->modelMatrices[i * fr->cityColumnCount + j]);
 
             // Compute the model-view-projection matrix.
-            XMMATRIX vp_XMMATRIX = XMMatrixMultiply(view, projection);
-            XMMATRIX mvp_XMMATRIX = XMMatrixMultiply(&model, &vp_XMMATRIX);
+            XMMATRIX mv_XMMATRIX = XMMatrixMultiply(&model, view);
+            XMMATRIX mvp_XMMATRIX = XMMatrixMultiply(&mv_XMMATRIX, projection);
             XMMATRIX mvpTranspose_XMMATRIX = XMMatrixTranspose(&mvp_XMMATRIX);
             XMStoreFloat4x4(&mvp, &mvpTranspose_XMMATRIX);
 

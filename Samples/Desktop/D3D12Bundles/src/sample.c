@@ -331,7 +331,7 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
 			.InputLayout = { 
 				.pInputElementDescs = SampleAssets_StandardVertexDescription, 
-			    .NumElements = SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS 
+			    .NumElements = SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS
 		     },
 			.pRootSignature = sample->rootSignature,
 			.VS = (D3D12_SHADER_BYTECODE){
@@ -565,6 +565,7 @@ static void LoadAssets(DXSample* const sample)
 			.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D,
 			.Texture2D.MipLevels = 1,
 		};
+		// SRV will be the first
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvHandle;
 		CALL(GetCPUDescriptorHandleForHeapStart, sample->cbvSrvHeap, &cbvSrvHandle);
 		CALL(CreateShaderResourceView, sample->device, sample->texture, &srvDesc, cbvSrvHandle);
@@ -719,7 +720,9 @@ static void CreateFrameResources(DXSample* const sample)
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvHandle;
 	CALL(GetCPUDescriptorHandleForHeapStart, sample->cbvSrvHeap, &cbvSrvHandle);
-	cbvSrvHandle.ptr = (SIZE_T)((INT64)(cbvSrvHandle.ptr) + sample->cbvSrvDescriptorSize);
+	// Start offseted one descriptor size, to move past the SRV in slot 1
+	cbvSrvHandle.ptr = (SIZE_T)(((INT64)cbvSrvHandle.ptr) + ((INT64)sample->cbvSrvDescriptorSize));
+
 	// Initialize each frame resource.
 	for (UINT i = 0; i < FrameCount; i++)
 	{

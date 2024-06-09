@@ -6,10 +6,10 @@
 #define SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS 4
 #define SampleAssets_STANDARD_VERTEX_STRIDE 44
 #define SampleAssets_STANDARD_INDEX_FORMAT DXGI_FORMAT_R32_UINT
-#define SampleAssets_VERTEX_DATA_OFFSET 524288
-#define SampleAssets_VERTEX_DATA_SIZE 820248
-#define SampleAssets_INDEX_DATA_OFFSET 1344536
-#define SampleAssets_INDEX_DATA_SIZE 74568
+#define SampleAssets_VERTEX_DATA_OFFSET 524288U
+#define SampleAssets_VERTEX_DATA_SIZE 820248U
+#define SampleAssets_INDEX_DATA_OFFSET 1344536U
+#define SampleAssets_INDEX_DATA_SIZE 74568U
 #define SampleAssets_DATA_FILE_NAME L"occcity.bin"
 
 typedef struct SampleAssets_TextureResource
