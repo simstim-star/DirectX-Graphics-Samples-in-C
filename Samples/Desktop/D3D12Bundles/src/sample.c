@@ -176,7 +176,7 @@ static void LoadPipeline(DXSample* const sample)
 
 	/* Create command queue */
 
-	D3D12_COMMAND_QUEUE_DESC queueDesc = { .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,  .Type = D3D12_COMMAND_LIST_TYPE_DIRECT };
+	D3D12_COMMAND_QUEUE_DESC queueDesc = { .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE, .Type = D3D12_COMMAND_LIST_TYPE_DIRECT };
 	ID3D12CommandQueue* commandQueue = NULL;
 	ExitIfFailed(CALL(CreateCommandQueue, sample->device, &queueDesc, IID_PPV_ARGS(&sample->commandQueue)));
 
@@ -331,7 +331,7 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {
 			.InputLayout = { 
 				.pInputElementDescs = SampleAssets_StandardVertexDescription, 
-			    .NumElements = SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS
+			    .NumElements = _countof(SampleAssets_StandardVertexDescription)
 		     },
 			.pRootSignature = sample->rootSignature,
 			.VS = (D3D12_SHADER_BYTECODE){
@@ -388,7 +388,7 @@ static void LoadAssets(DXSample* const sample)
 		ExitIfFailed(CALL(GetBuffer, sample->swapChain, i, IID_PPV_ARGS(&sample->renderTargets[i])));
 		CALL(CreateRenderTargetView, sample->device, sample->renderTargets[i], NULL, rtvHandle);
 		// walk an offset equivalent to one descriptor to go to next space to store the next RTV
-		rtvHandle.ptr = (SIZE_T)((INT64)(rtvHandle.ptr) + (INT64)(sample->rtvDescriptorSize));
+		rtvHandle.ptr += sample->rtvDescriptorSize;
 		NAME_D3D12_OBJECT_INDEXED(sample->renderTargets, i);
 	}
 
@@ -404,7 +404,7 @@ static void LoadAssets(DXSample* const sample)
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&vertexBufferDesc,
-			D3D12_RESOURCE_STATE_COMMON,
+			D3D12_RESOURCE_STATE_COPY_DEST,
 			NULL,
 			IID_PPV_ARGS(&sample->vertexBuffer))
 		);
@@ -449,7 +449,7 @@ static void LoadAssets(DXSample* const sample)
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&indexBufferDesc,
-			D3D12_RESOURCE_STATE_COMMON,
+			D3D12_RESOURCE_STATE_COPY_DEST,
 			NULL,
 			IID_PPV_ARGS(&sample->indexBuffer)));
 
@@ -485,7 +485,7 @@ static void LoadAssets(DXSample* const sample)
 		sample->indexBufferView.Format = SampleAssets_STANDARD_INDEX_FORMAT;
 		sample->indexBufferView.SizeInBytes = SampleAssets_INDEX_DATA_SIZE;
 
-		sample->numIndices = SampleAssets_INDEX_DATA_SIZE / 4;    // R32_UINT (SampleAssets_StandardIndexFormat) = 4 bytes each.
+		sample->numIndices = SampleAssets_INDEX_DATA_SIZE / 4U;    // R32_UINT (SampleAssets_StandardIndexFormat) = 4 bytes each.
 	}
 
 	// Create the texture and sampler.

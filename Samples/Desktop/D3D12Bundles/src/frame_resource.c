@@ -6,7 +6,7 @@
 #include "dxheaders/d3dx12c_core.h"
 #include "DirectXMathC.h"
 
-static void SetCityPositions(FrameResource* fr, FLOAT intervalX, FLOAT intervalZ)
+static void SetCityPositions(FrameResource* const fr, FLOAT intervalX, FLOAT intervalZ)
 {
     for (UINT i = 0; i < fr->cityRowCount; i++)
     {
@@ -21,7 +21,7 @@ static void SetCityPositions(FrameResource* fr, FLOAT intervalX, FLOAT intervalZ
     }
 }
 
-void FrameResource_Init(FrameResource* fr, ID3D12Device* device, UINT cityRowCount, UINT cityColumnCount){
+void FrameResource_Init(FrameResource* const fr, ID3D12Device* const device, UINT cityRowCount, UINT cityColumnCount){
     fr->fenceValue = 0;
     fr->cityRowCount = cityRowCount;
     fr->cityColumnCount = cityColumnCount;
@@ -59,18 +59,18 @@ void FrameResource_Init(FrameResource* fr, ID3D12Device* device, UINT cityRowCou
     SetCityPositions(fr, 8.0f, -8.0f);
 }
 
-void FrameResource_InitBundle(FrameResource* fr,
-    ID3D12Device* device, 
-    ID3D12PipelineState* pso1, 
-    ID3D12PipelineState* pso2,
+void FrameResource_InitBundle(FrameResource* const fr,
+    ID3D12Device* const device,
+    ID3D12PipelineState* const pso1,
+    ID3D12PipelineState* const pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
-    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* const indexBufferViewDesc,
+    D3D12_VERTEX_BUFFER_VIEW* const vertexBufferViewDesc,
+    ID3D12DescriptorHeap* const cbvSrvDescriptorHeap,
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* samplerDescriptorHeap, 
-    ID3D12RootSignature* rootSignature)
+    ID3D12DescriptorHeap* const samplerDescriptorHeap,
+    ID3D12RootSignature* const rootSignature)
 {
     ExitIfFailed(CALL(CreateCommandList, device, 0, D3D12_COMMAND_LIST_TYPE_BUNDLE, fr->bundleAllocator, pso1, IID_PPV_ARGS(&fr->bundle)));
     NAME_D3D12_OBJECT(fr->bundle);
@@ -79,18 +79,18 @@ void FrameResource_InitBundle(FrameResource* fr,
     ExitIfFailed(CALL(Close, fr->bundle));
 }
 
-void FrameResource_PopulateCommandList(FrameResource* fr,
-    ID3D12GraphicsCommandList* commandList,
-    ID3D12PipelineState* pso1, 
-    ID3D12PipelineState* pso2,
+void FrameResource_PopulateCommandList(FrameResource* const fr,
+    ID3D12GraphicsCommandList* const commandList,
+    ID3D12PipelineState* const pso1,
+    ID3D12PipelineState* const pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
-    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* const indexBufferViewDesc,
+    D3D12_VERTEX_BUFFER_VIEW* const vertexBufferViewDesc,
+    ID3D12DescriptorHeap* const cbvSrvDescriptorHeap,
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* samplerDescriptorHeap, 
-    ID3D12RootSignature* rootSignature)
+    ID3D12DescriptorHeap* const samplerDescriptorHeap,
+    ID3D12RootSignature* const rootSignature)
 {
     // If the root signature matches the root signature of the caller, then
     // bindings are inherited, otherwise the bind space is reset.
@@ -130,7 +130,7 @@ void FrameResource_PopulateCommandList(FrameResource* fr,
     }
 }
 
-void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* fr, FXMMATRIX view, CXMMATRIX projection)
+void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* const fr, FXMMATRIX view, CXMMATRIX projection)
 {
     XMMATRIX model;
     XMFLOAT4X4 mvp;
@@ -153,7 +153,7 @@ void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* fr, FXMMATRI
     }
 }
 
-void FrameResource_Clean(FrameResource* fr)
+void FrameResource_Clean(FrameResource* const fr)
 {
     CALL(Unmap, fr->cbvUploadHeap, 0, NULL);
     fr->pConstantBuffers = NULL;

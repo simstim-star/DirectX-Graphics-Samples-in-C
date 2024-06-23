@@ -45,7 +45,7 @@ static inline D3D12_BLEND_DESC CD3DX12_DEFAULT_BLEND_DESC(void)
 	BlendDesc.IndependentBlendEnable = FALSE;
 	for (int i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i) {
 		BlendDesc.RenderTarget[i] = (D3D12_RENDER_TARGET_BLEND_DESC){
-			.BlendEnable = FALSE,
+			.BlendEnable = FALSE, 
 			.LogicOpEnable = FALSE,
 			.SrcBlend = D3D12_BLEND_ONE,
 			.DestBlend = D3D12_BLEND_ZERO,
@@ -99,6 +99,7 @@ static inline D3D12_DEPTH_STENCIL_DESC CD3DX12_DEFAULT_DEPTH_STENCIL_DESC(void)
 		.StencilPassOp = D3D12_STENCIL_OP_KEEP, 
 		.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS 
 	};
+
 	return (D3D12_DEPTH_STENCIL_DESC) {
 		.DepthEnable = TRUE,
 		.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL,

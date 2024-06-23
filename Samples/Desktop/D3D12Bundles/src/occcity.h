@@ -4,7 +4,7 @@
 #include <d3d12.h>
 
 #define SampleAssets_STANDARD_VERTEX_DESC_NUM_ELEMENTS 4
-#define SampleAssets_STANDARD_VERTEX_STRIDE 44
+#define SampleAssets_STANDARD_VERTEX_STRIDE 44U
 #define SampleAssets_STANDARD_INDEX_FORMAT DXGI_FORMAT_R32_UINT
 #define SampleAssets_VERTEX_DATA_OFFSET 524288U
 #define SampleAssets_VERTEX_DATA_SIZE 820248U

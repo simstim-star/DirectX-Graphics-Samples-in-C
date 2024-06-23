@@ -33,35 +33,35 @@ typedef struct FrameResource
     UINT cityColumnCount;
 } FrameResource;
 
-void FrameResource_Init(FrameResource *fr, ID3D12Device* device, UINT cityRowCount, UINT cityColumnCount);
-void FrameResource_Clean(FrameResource* fr);
+void FrameResource_Init(FrameResource * const fr, ID3D12Device* const device, UINT cityRowCount, UINT cityColumnCount);
+void FrameResource_Clean(FrameResource* const fr);
 
-void FrameResource_InitBundle(FrameResource* fr,
-    ID3D12Device* device, 
-    ID3D12PipelineState* pso1, 
-    ID3D12PipelineState* pso2,
+void FrameResource_InitBundle(FrameResource* const fr,
+    ID3D12Device* const device,
+    ID3D12PipelineState* const pso1,
+    ID3D12PipelineState* const pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
-    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* const indexBufferViewDesc,
+    D3D12_VERTEX_BUFFER_VIEW* const vertexBufferViewDesc,
+    ID3D12DescriptorHeap* const cbvSrvDescriptorHeap,
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* samplerDescriptorHeap, 
-    ID3D12RootSignature* rootSignature
+    ID3D12DescriptorHeap* const samplerDescriptorHeap,
+    ID3D12RootSignature* const rootSignature
 );
 
-void FrameResource_PopulateCommandList(FrameResource* fr,
-    ID3D12GraphicsCommandList* commandList, 
-    ID3D12PipelineState* pso1, 
-    ID3D12PipelineState* pso2,
+void FrameResource_PopulateCommandList(FrameResource* const fr,
+    ID3D12GraphicsCommandList* const commandList,
+    ID3D12PipelineState* const pso1,
+    ID3D12PipelineState* const pso2,
     UINT frameResourceIndex, 
     UINT numIndices, 
-    D3D12_INDEX_BUFFER_VIEW* indexBufferViewDesc, 
-    D3D12_VERTEX_BUFFER_VIEW* vertexBufferViewDesc,
-    ID3D12DescriptorHeap* cbvSrvDescriptorHeap, 
+    D3D12_INDEX_BUFFER_VIEW* const indexBufferViewDesc,
+    D3D12_VERTEX_BUFFER_VIEW* const vertexBufferViewDesc,
+    ID3D12DescriptorHeap* const cbvSrvDescriptorHeap,
     UINT cbvSrvDescriptorSize, 
-    ID3D12DescriptorHeap* samplerDescriptorHeap, 
-    ID3D12RootSignature* rootSignature
+    ID3D12DescriptorHeap* const samplerDescriptorHeap,
+    ID3D12RootSignature* const rootSignature
 );
 
-void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* fr, FXMMATRIX view, CXMMATRIX projection);
+void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* const fr, FXMMATRIX view, CXMMATRIX projection);
