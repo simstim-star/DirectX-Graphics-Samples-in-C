@@ -111,7 +111,7 @@ void FrameResource_PopulateCommandList(FrameResource* const fr,
     // Calculate the descriptor offset due to multiple frame resources.
     // 1 SRV + how many CBVs we have currently.
     UINT frameResourceDescriptorOffset = 1 + (frameResourceIndex * fr->cityRowCount * fr->cityColumnCount);
-    cbvSrvHandle.ptr = (UINT64)((INT64)cbvSrvHandle.ptr + (((INT64)frameResourceDescriptorOffset) * ((INT64)cbvSrvDescriptorSize)));
+    cbvSrvHandle.ptr += ((UINT64)frameResourceDescriptorOffset) * ((UINT64)cbvSrvDescriptorSize);
 
     BOOL usePso1 = TRUE;
     for (UINT i = 0; i < fr->cityRowCount; i++)
