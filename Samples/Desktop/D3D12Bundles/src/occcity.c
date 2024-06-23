@@ -10,5 +10,9 @@ const D3D12_INPUT_ELEMENT_DESC SampleAssets_StandardVertexDescription[] =
 
 SampleAssets_TextureResource SampleAssets_Textures[] =
 {
-	{ 1024, 1024, 1, DXGI_FORMAT_BC1_UNORM, { { 0, 524288, 2048 }, } }, // city.dds
+	{ .Width = 1024, 
+	  .Height = 1024, 
+	  .MipLevels = 1, 
+	  .Format = DXGI_FORMAT_BC1_UNORM, 
+	  .Data = { { .Offset = 0, .Size = 524288, .Pitch = 2048 }, } }, // city.dds
 };
