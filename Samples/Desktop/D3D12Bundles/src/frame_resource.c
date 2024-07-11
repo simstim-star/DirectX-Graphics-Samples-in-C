@@ -6,17 +6,20 @@
 #include "dxheaders/d3dx12c_core.h"
 #include "DirectXMathC.h"
 
-static void SetCityPositions(FrameResource* const fr, FLOAT intervalX, FLOAT intervalZ)
+// The slope upwards of the city moving deeper into a row and/or column of buildings
+static const FLOAT CITY_SLOPE = 0.02f;
+
+static void SetCityPositions(FrameResource* const fr, FLOAT intervalCol, FLOAT intervalRow)
 {
-    for (UINT i = 0; i < fr->cityRowCount; i++)
+    for (UINT row = 0; row < fr->cityRowCount; row++)
     {
-        FLOAT cityOffsetZ = i * intervalZ;
-        for (UINT j = 0; j < fr->cityColumnCount; j++)
+        FLOAT rowOffset = row * intervalRow;
+        for (UINT col = 0; col < fr->cityColumnCount; col++)
         {
-            FLOAT cityOffsetX = j * intervalX;
-            // The y position is based off of the city's row and column position to prevent z-fighting.
-            XMMATRIX translated = XMMatrixTranslation(cityOffsetX, 0.02f * (i * fr->cityColumnCount + j), cityOffsetZ);
-            XMStoreFloat4x4(&fr->modelMatrices[i * fr->cityColumnCount + j], &translated);
+            FLOAT colOffset = col * intervalCol;
+            // The y position ("up") is based off of the city's row and column position to prevent z-fighting.
+            XMMATRIX translated = XMMatrixTranslation(colOffset, CITY_SLOPE * (row * fr->cityColumnCount + col), rowOffset);
+            XMStoreFloat4x4(&fr->modelMatrices[row * fr->cityColumnCount + col], &translated);
         }
     }
 }
@@ -114,9 +117,9 @@ void FrameResource_PopulateCommandList(FrameResource* const fr,
     cbvSrvHandle.ptr += ((UINT64)frameResourceDescriptorOffset) * ((UINT64)cbvSrvDescriptorSize);
 
     BOOL usePso1 = TRUE;
-    for (UINT i = 0; i < fr->cityRowCount; i++)
+    for (UINT row = 0; row < fr->cityRowCount; row++)
     {
-        for (UINT j = 0; j < fr->cityColumnCount; j++)
+        for (UINT col = 0; col < fr->cityColumnCount; col++)
         {
             // Alternate which PSO to use; the pixel shader is different on 
             // each just as a PSO setting demonstration.
@@ -124,7 +127,7 @@ void FrameResource_PopulateCommandList(FrameResource* const fr,
             usePso1 = !usePso1;
             // Set this city's CBV table and move to the next descriptor.
             CALL(SetGraphicsRootDescriptorTable, commandList, 2, cbvSrvHandle);
-            cbvSrvHandle.ptr = (UINT64)((INT64)cbvSrvHandle.ptr + (INT64)cbvSrvDescriptorSize);
+            cbvSrvHandle.ptr += (UINT64)cbvSrvDescriptorSize;
             CALL(DrawIndexedInstanced, commandList, numIndices, 1, 0, 0, 0);
         }
     }
@@ -135,11 +138,12 @@ void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* const fr, FX
     XMMATRIX model;
     XMFLOAT4X4 mvp;
 
-    for (UINT i = 0; i < fr->cityRowCount; i++)
+    for (UINT row = 0; row < fr->cityRowCount; row++)
     {
-        for (UINT j = 0; j < fr->cityColumnCount; j++)
+        for (UINT col = 0; col < fr->cityColumnCount; col++)
         {
-            model = XMLoadFloat4x4(&fr->modelMatrices[i * fr->cityColumnCount + j]);
+            UINT currentCityBlock = row * fr->cityColumnCount + col;
+            model = XMLoadFloat4x4(&fr->modelMatrices[currentCityBlock]);
 
             // Compute the model-view-projection matrix.
             XMMATRIX mv_XMMATRIX = XMMatrixMultiply(&model, view);
@@ -148,7 +152,7 @@ void XM_CALLCONV FrameResource_UpdateConstantBuffers(FrameResource* const fr, FX
             XMStoreFloat4x4(&mvp, &mvpTranspose_XMMATRIX);
 
             // Copy this matrix into the appropriate location in the upload heap subresource.
-            memcpy(&fr->pConstantBuffers[i * fr->cityColumnCount + j], &mvp, sizeof(mvp));
+            memcpy(&fr->pConstantBuffers[currentCityBlock], &mvp, sizeof(mvp));
         }
     }
 }

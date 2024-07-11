@@ -33,7 +33,14 @@ void Sample_Init(DXSample* const sample) {
 	sample->frameIndex = 0;
 	sample->frameCounter = 0;
 	sample->fenceValue = 0;
-	sample->viewport = (D3D12_VIEWPORT){ 0.0f, 0.0f, (float)(sample->width), (float)(sample->height) };
+	sample->viewport = (D3D12_VIEWPORT){ 
+		.TopLeftX = 0.0f, 
+		.TopLeftY = 0.0f, 
+		.Width = (float)(sample->width), 
+		.Height = (float)(sample->height),
+		.MinDepth = 0.0f,
+		.MaxDepth = 1.0f
+	};
 	sample->scissorRect = (D3D12_RECT){ 0, 0, (LONG)(sample->width), (LONG)(sample->height) };
 	sample->rtvDescriptorSize = 0;
 	sample->currentFrameResourceIndex = 0;
@@ -724,15 +731,15 @@ static void CreateFrameResources(DXSample* const sample)
 	cbvSrvHandle.ptr = (SIZE_T)(((INT64)cbvSrvHandle.ptr) + ((INT64)sample->cbvSrvDescriptorSize));
 
 	// Initialize each frame resource.
-	for (UINT i = 0; i < FrameCount; i++)
+	for (UINT frame = 0; frame < FrameCount; frame++)
 	{
 		FrameResource* pFrameResource = HeapAlloc(GetProcessHeap(), 0, sizeof(FrameResource));
 		FrameResource_Init(pFrameResource, sample->device, CityRowCount, CityColumnCount);
 
 		UINT64 cbOffset = 0;
-		for (UINT j = 0; j < CityRowCount; j++)
+		for (UINT row = 0; row < CityRowCount; row++)
 		{
-			for (UINT k = 0; k < CityColumnCount; k++)
+			for (UINT col = 0; col < CityColumnCount; col++)
 			{
 				D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress = CALL(GetGPUVirtualAddress, pFrameResource->cbvUploadHeap);
 				// Describe and create a constant buffer view (CBV).
@@ -749,7 +756,7 @@ static void CreateFrameResources(DXSample* const sample)
 			sample->device,
 			sample->pipelineState1,
 			sample->pipelineState2,
-			i,
+			frame,
 			sample->numIndices,
 			&sample->indexBufferView,
 			&sample->vertexBufferView,
@@ -758,7 +765,7 @@ static void CreateFrameResources(DXSample* const sample)
 			sample->samplerHeap,
 			sample->rootSignature);
 
-		sample->frameResources[i] = pFrameResource;
+		sample->frameResources[frame] = pFrameResource;
 	}
 }
 
