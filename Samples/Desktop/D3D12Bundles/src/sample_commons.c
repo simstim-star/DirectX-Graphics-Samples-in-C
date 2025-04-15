@@ -4,9 +4,9 @@
 #include <dxgi1_6.h>
 #include "dxheaders/d3dx12_macros.h"
 
-void ExitIfFailed(const HRESULT hr)
+void LogAndExit(const HRESULT hr)
 {
-	if (FAILED(hr)) {
+	if (FAILED(hr)) { // remove this check once every usage is refactored
 		char s_str[64] = "";
 		if (snprintf(s_str, 64, "ERROR: HRESULT 0x%08X\n", (UINT)hr) > 0) {
 			OutputDebugString(s_str);
@@ -67,7 +67,7 @@ void GetHardwareAdapter(
 
 			// Check to see whether the adapter supports Direct3D 12, but don't create the actual device yet
 			IUnknown* adapterAsIUnknown = NULL;
-			ExitIfFailed(CAST(adapter, adapterAsIUnknown));
+			LogAndExit(CAST(adapter, adapterAsIUnknown));
 			if (SUCCEEDED(D3D12CreateDevice(adapterAsIUnknown, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, NULL)))
 			{
 				RELEASE(adapterAsIUnknown);
@@ -93,7 +93,7 @@ void GetHardwareAdapter(
 
 			// Check to see whether the adapter supports Direct3D 12, but don't create the actual device yet
 			IUnknown* adapterAsIUnknown = NULL;
-			ExitIfFailed(CAST(adapter, adapterAsIUnknown));
+			LogAndExit(CAST(adapter, adapterAsIUnknown));
 			if (SUCCEEDED(D3D12CreateDevice(adapterAsIUnknown, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device, NULL)))
 			{
 				RELEASE(adapterAsIUnknown);

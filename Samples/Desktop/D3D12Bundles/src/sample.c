@@ -1,3 +1,5 @@
+#define COBJMACROS
+
 #include <dxgi1_6.h>
 #include <stdio.h>
 
@@ -62,11 +64,11 @@ void Sample_Destroy(DXSample* const sample)
 		const UINT64 fenceValue = sample->fenceValue;
 		const UINT64 lastCompletedFence = CALL(GetCompletedValue, sample->fence);
 		// Signal and increment the fence value.
-		ExitIfFailed(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
+		LogAndExit(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
 		// Wait until the previous frame is finished.
 		if (lastCompletedFence < fenceValue)
 		{
-			ExitIfFailed(CALL(SetEventOnCompletion, sample->fence, fenceValue, sample->fenceEvent));
+			LogAndExit(CALL(SetEventOnCompletion, sample->fence, fenceValue, sample->fenceEvent));
 			WaitForSingleObject(sample->fenceEvent, INFINITE);
 		}
 	}
@@ -106,7 +108,7 @@ void Sample_Update(DXSample* const sample) {
 	// If it is, wait for it to complete.
 	if (sample->currFrameResource->fenceValue != 0 && sample->currFrameResource->fenceValue > lastCompletedFence)
 	{
-		ExitIfFailed(CALL(SetEventOnCompletion, sample->fence, sample->currFrameResource->fenceValue, sample->fenceEvent));
+		LogAndExit(CALL(SetEventOnCompletion, sample->fence, sample->currFrameResource->fenceValue, sample->fenceEvent));
 		WaitForSingleObject(sample->fenceEvent, INFINITE);
 	}
 
@@ -124,16 +126,18 @@ void Sample_Render(DXSample* const sample)
 	ID3D12CommandList* asCommandList = NULL;
 	CAST(sample->commandList, asCommandList);
 	ID3D12CommandList* ppCommandLists[] = { asCommandList };
-	CALL(ExecuteCommandLists, sample->commandQueue, _countof(ppCommandLists), ppCommandLists);
+	ID3D12CommandQueue_ExecuteCommandLists(sample->commandQueue, _countof(ppCommandLists), ppCommandLists);
 	RELEASE(asCommandList);
 
 	// Present and update the frame index for the next frame.
-	ExitIfFailed(CALL(Present, sample->swapChain, 1, 0));
-	sample->frameIndex = CALL(GetCurrentBackBufferIndex, sample->swapChain);
+	HRESULT hr = IDXGISwapChain3_Present(sample->swapChain, 1, 0);
+	if (FAILED(hr)) LogAndExit(hr);
+	sample->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(sample->swapChain);
 
 	// Signal and increment the fence value.
 	sample->currFrameResource->fenceValue = sample->fenceValue;
-	ExitIfFailed(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
+	hr = ID3D12CommandQueue_Signal(sample->commandQueue, sample->fence, sample->fenceValue);
+	if (FAILED(hr)) LogAndExit(hr);
 	sample->fenceValue++;
 }
 
@@ -152,32 +156,36 @@ void Sample_OnKeyUp(DXSample* const sample, UINT8 key) {
 static void LoadPipeline(DXSample* const sample)
 {
 	int isDebugFactory = 0;
+	HRESULT hr;
 
 #if defined(_DEBUG)
 	// Enable the debug layer (requires the Graphics Tools "optional feature").
 	ID3D12Debug* debugController = NULL;
-	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+	hr = D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
+	if (SUCCEEDED(hr))
 	{
-		CALL(EnableDebugLayer, debugController);
+		ID3D12Debug_EnableDebugLayer(debugController);
 		isDebugFactory |= DXGI_CREATE_FACTORY_DEBUG;
 		RELEASE(debugController);
 	}
 #endif
 
 	IDXGIFactory4* factory = NULL;
-	ExitIfFailed(CreateDXGIFactory2(isDebugFactory, IID_PPV_ARGS(&factory)));
+	hr = CreateDXGIFactory2(isDebugFactory, IID_PPV_ARGS(&factory));
+	if (FAILED(hr)) LogAndExit(hr);
 
 	/* Create device */
 
 	IDXGIAdapter1* hardwareAdapter = NULL;
 	IDXGIFactory1* factoryAsFactory1 = NULL;
-	ExitIfFailed(CAST(factory, factoryAsFactory1));
+	hr = CAST(factory, factoryAsFactory1);
+	if (FAILED(hr)) LogAndExit(hr);
 	GetHardwareAdapter(factoryAsFactory1, &hardwareAdapter, false);
 	RELEASE(factoryAsFactory1);
 
 	IUnknown* hardwareAdapterAsUnknown = NULL;
-	ExitIfFailed(CAST(hardwareAdapter, hardwareAdapterAsUnknown));
-	ExitIfFailed(D3D12CreateDevice(hardwareAdapterAsUnknown, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&sample->device)));
+	LogAndExit(CAST(hardwareAdapter, hardwareAdapterAsUnknown));
+	LogAndExit(D3D12CreateDevice(hardwareAdapterAsUnknown, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&sample->device)));
 	RELEASE(hardwareAdapterAsUnknown);
 	RELEASE(hardwareAdapter);
 
@@ -185,7 +193,7 @@ static void LoadPipeline(DXSample* const sample)
 
 	D3D12_COMMAND_QUEUE_DESC queueDesc = { .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE, .Type = D3D12_COMMAND_LIST_TYPE_DIRECT };
 	ID3D12CommandQueue* commandQueue = NULL;
-	ExitIfFailed(CALL(CreateCommandQueue, sample->device, &queueDesc, IID_PPV_ARGS(&sample->commandQueue)));
+	LogAndExit(CALL(CreateCommandQueue, sample->device, &queueDesc, IID_PPV_ARGS(&sample->commandQueue)));
 
 	/* Create swap chain */
 
@@ -200,9 +208,9 @@ static void LoadPipeline(DXSample* const sample)
 	};
 
 	IUnknown* commandQueueAsIUnknown = NULL;
-	ExitIfFailed(CAST(sample->commandQueue, commandQueueAsIUnknown));
+	LogAndExit(CAST(sample->commandQueue, commandQueueAsIUnknown));
 	IDXGISwapChain1* swapChainAsSwapChain1 = NULL;
-	ExitIfFailed(CALL(CreateSwapChainForHwnd,
+	LogAndExit(CALL(CreateSwapChainForHwnd,
 		factory,
 		commandQueueAsIUnknown,        // Swap chain needs the queue so that it can force a flush on it
 		G_HWND,
@@ -212,10 +220,10 @@ static void LoadPipeline(DXSample* const sample)
 		&swapChainAsSwapChain1
 	));
 	RELEASE(commandQueueAsIUnknown);
-	ExitIfFailed(CAST(swapChainAsSwapChain1, sample->swapChain));
+	LogAndExit(CAST(swapChainAsSwapChain1, sample->swapChain));
 	RELEASE(swapChainAsSwapChain1);
 
-	ExitIfFailed(CALL(MakeWindowAssociation, factory, G_HWND, DXGI_MWA_NO_ALT_ENTER));
+	LogAndExit(CALL(MakeWindowAssociation, factory, G_HWND, DXGI_MWA_NO_ALT_ENTER));
 	sample->frameIndex = CALL(GetCurrentBackBufferIndex, sample->swapChain);
 
 	/* Create descriptor heaps (3 RTVs, 1 DSV, 1 SRV, many CBVs for resources and a Sampler in this example) */
@@ -226,7 +234,7 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE
 		};
-		ExitIfFailed(CALL(CreateDescriptorHeap, sample->device, &rtvHeapDesc, IID_PPV_ARGS(&sample->rtvHeap)));
+		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &rtvHeapDesc, IID_PPV_ARGS(&sample->rtvHeap)));
 		sample->rtvDescriptorSize = CALL(GetDescriptorHandleIncrementSize, sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		// DSV
@@ -235,7 +243,7 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE
 		};
-		ExitIfFailed(CALL(CreateDescriptorHeap, sample->device, &dsvHeapDesc, IID_PPV_ARGS(&sample->dsvHeap)));
+		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &dsvHeapDesc, IID_PPV_ARGS(&sample->dsvHeap)));
 
 		// SRV and CBV
 		D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {
@@ -245,7 +253,7 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
 		};
-		ExitIfFailed(CALL(CreateDescriptorHeap, sample->device, &cbvSrvHeapDesc, IID_PPV_ARGS(&sample->cbvSrvHeap)));
+		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &cbvSrvHeapDesc, IID_PPV_ARGS(&sample->cbvSrvHeap)));
 		sample->cbvSrvDescriptorSize = CALL(GetDescriptorHandleIncrementSize, sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		NAME_D3D12_OBJECT(sample->cbvSrvHeap);
@@ -256,10 +264,10 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
 		};
-		ExitIfFailed(CALL(CreateDescriptorHeap, sample->device, &samplerHeapDesc, IID_PPV_ARGS(&sample->samplerHeap)));
+		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &samplerHeapDesc, IID_PPV_ARGS(&sample->samplerHeap)));
 	}
 
-	ExitIfFailed(CALL(CreateCommandAllocator, sample->device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&sample->commandAllocator)));
+	LogAndExit(CALL(CreateCommandAllocator, sample->device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&sample->commandAllocator)));
 	RELEASE(factory);
 }
 
@@ -311,10 +319,10 @@ static void LoadAssets(DXSample* const sample)
 		ID3DBlob* signature = NULL;
 		ID3DBlob* error = NULL;
 
-		ExitIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
+		LogAndExit(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
 		const LPVOID bufferPointer = CALL(GetBufferPointer, signature);
 		const SIZE_T bufferSize = CALL(GetBufferSize, signature);
-		ExitIfFailed(CALL(CreateRootSignature, sample->device, 0, bufferPointer, bufferSize, IID_PPV_ARGS(&sample->rootSignature)));
+		LogAndExit(CALL(CreateRootSignature, sample->device, 0, bufferPointer, bufferSize, IID_PPV_ARGS(&sample->rootSignature)));
 	}
 
 	/* Create the pipeline state, which includes loading shaders */
@@ -360,7 +368,7 @@ static void LoadAssets(DXSample* const sample)
 			.SampleDesc.Count = 1,
 		};
 
-		ExitIfFailed(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState1)));
+		LogAndExit(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState1)));
 		NAME_D3D12_OBJECT(sample->pipelineState1);
 
 		// Modify the description to use an alternate pixel shader and create a second PSO.
@@ -368,7 +376,7 @@ static void LoadAssets(DXSample* const sample)
 				.pShaderBytecode = pPixelShaderData2,
 				.BytecodeLength = pixelShaderDataLength2,
 		};
-		ExitIfFailed(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState2)));
+		LogAndExit(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState2)));
 		NAME_D3D12_OBJECT(sample->pipelineState2);
 
 		CleanAllocatedDataFromFile(pVertexShaderData);
@@ -378,7 +386,7 @@ static void LoadAssets(DXSample* const sample)
 
 	/* Create the command list */
 
-	ExitIfFailed(CALL(CreateCommandList, sample->device, 
+	LogAndExit(CALL(CreateCommandList, sample->device, 
 		0, 
 		D3D12_COMMAND_LIST_TYPE_DIRECT, 
 		sample->commandAllocator, 
@@ -392,7 +400,7 @@ static void LoadAssets(DXSample* const sample)
 	CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvHandle);
 	for (UINT i = 0; i < FrameCount; i++)
 	{
-		ExitIfFailed(CALL(GetBuffer, sample->swapChain, i, IID_PPV_ARGS(&sample->renderTargets[i])));
+		LogAndExit(CALL(GetBuffer, sample->swapChain, i, IID_PPV_ARGS(&sample->renderTargets[i])));
 		CALL(CreateRenderTargetView, sample->device, sample->renderTargets[i], NULL, rtvHandle);
 		// walk an offset equivalent to one descriptor to go to next space to store the next RTV
 		rtvHandle.ptr += sample->rtvDescriptorSize;
@@ -407,7 +415,7 @@ static void LoadAssets(DXSample* const sample)
 	{
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_VERTEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&vertexBufferDesc,
@@ -418,7 +426,7 @@ static void LoadAssets(DXSample* const sample)
 
 		D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC vertexBufferDescUpload = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_VERTEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&uploadHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&vertexBufferDescUpload,
@@ -452,7 +460,7 @@ static void LoadAssets(DXSample* const sample)
 	{
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_INDEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&indexBufferDesc,
@@ -463,7 +471,7 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC indexBufferDescUpload = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_INDEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
 
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&uploadHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&indexBufferDescUpload,
@@ -510,7 +518,7 @@ static void LoadAssets(DXSample* const sample)
 			.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
 		};
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&textureDesc,
@@ -524,7 +532,7 @@ static void LoadAssets(DXSample* const sample)
 		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(sample->texture, 0, subresourceCount);
 		D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC uploadBuffer = CD3DX12_RESOURCE_DESC_BUFFER(uploadBufferSize, D3D12_RESOURCE_FLAG_NONE, 0);
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&uploadHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&uploadBuffer,
@@ -596,7 +604,7 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		D3D12_RESOURCE_DESC texDesc = CD3DX12_TEX2D(DXGI_FORMAT_D32_FLOAT, sample->width, sample->height, 
 			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
+		LogAndExit(CALL(CreateCommittedResource, sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&texDesc,
@@ -613,7 +621,7 @@ static void LoadAssets(DXSample* const sample)
 	}
 
 	// Close the command list and execute it to begin the initial GPU setup.
-	ExitIfFailed(CALL(Close, sample->commandList));
+	LogAndExit(CALL(Close, sample->commandList));
 	ID3D12CommandList* asCommandList = NULL;
 	CAST(sample->commandList, asCommandList);
 	ID3D12CommandList* ppCommandLists[] = { asCommandList };
@@ -622,14 +630,14 @@ static void LoadAssets(DXSample* const sample)
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
-		ExitIfFailed(CALL(CreateFence, sample->device, sample->fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&sample->fence)));
+		LogAndExit(CALL(CreateFence, sample->device, sample->fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&sample->fence)));
 		sample->fenceValue++;
 
 		// Create an event handle to use for frame synchronization.
 		sample->fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 		if (sample->fenceEvent == NULL)
 		{
-			ExitIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+			LogAndExit(HRESULT_FROM_WIN32(GetLastError()));
 		}
 
 		// Wait for the command list to execute; we are reusing the same command 
@@ -638,11 +646,11 @@ static void LoadAssets(DXSample* const sample)
 
 		// Signal and increment the fence value.
 		const UINT64 fenceToWaitFor = sample->fenceValue;
-		ExitIfFailed(CALL(Signal, sample->commandQueue, sample->fence, fenceToWaitFor));
+		LogAndExit(CALL(Signal, sample->commandQueue, sample->fence, fenceToWaitFor));
 		sample->fenceValue++;
 
 		// Wait until the fence is completed.
-		ExitIfFailed(CALL(SetEventOnCompletion, sample->fence, fenceToWaitFor, sample->fenceEvent));
+		LogAndExit(CALL(SetEventOnCompletion, sample->fence, fenceToWaitFor, sample->fenceEvent));
 		WaitForSingleObject(sample->fenceEvent, INFINITE);
 	}
 
@@ -658,12 +666,12 @@ static void PopulateCommandList(DXSample* const sample)
 	// Command list allocators can only be reset when the associated
 	// command lists have finished execution on the GPU; apps should use
 	// fences to determine GPU execution progress.
-	ExitIfFailed(CALL(Reset, sample->currFrameResource->commandAllocator));
+	LogAndExit(CALL(Reset, sample->currFrameResource->commandAllocator));
 
 	// However, when ExecuteCommandList() is called on a particular command
 	// list, that command list can then be reset at any time and must be before
 	// re-recording.
-	ExitIfFailed(CALL(Reset, sample->commandList, sample->currFrameResource->commandAllocator, sample->pipelineState1));
+	LogAndExit(CALL(Reset, sample->commandList, sample->currFrameResource->commandAllocator, sample->pipelineState1));
 
 	// Set necessary state.
 	CALL(SetGraphicsRootSignature, sample->commandList, sample->rootSignature);
@@ -719,7 +727,7 @@ static void PopulateCommandList(DXSample* const sample)
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
 	CALL(ResourceBarrier, sample->commandList, 1, &transitionBarrierRTtoPresent);
-	ExitIfFailed(CALL(Close, sample->commandList));
+	LogAndExit(CALL(Close, sample->commandList));
 }
 
 // Create the resources that will be used every frame.
@@ -774,7 +782,7 @@ static void LoadShaderData(const WCHAR* const base, const WCHAR* const shaderRel
 	size_t bufferSize = wcslen(base) + wcslen(shaderRelativePath) + 1;
 	WCHAR* shaderDataPath = HeapAlloc(GetProcessHeap(), 0, bufferSize * sizeof(WCHAR));
 	swprintf(shaderDataPath, bufferSize, L"%s%s", base, shaderRelativePath);
-	ExitIfFailed(ReadDataFromFile(shaderDataPath, shaderData, shaderDataLen));
+	LogAndExit(ReadDataFromFile(shaderDataPath, shaderData, shaderDataLen));
 	HeapFree(GetProcessHeap(), 0, shaderDataPath);
 }
 

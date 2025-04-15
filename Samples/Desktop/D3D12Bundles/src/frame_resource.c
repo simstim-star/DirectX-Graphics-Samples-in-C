@@ -35,13 +35,13 @@ void FrameResource_Init(FrameResource* const fr, ID3D12Device* const device, UIN
     // resource needs a command allocator because command allocators 
     // cannot be reused until the GPU is done executing the commands 
     // associated with it.
-    ExitIfFailed(CALL(CreateCommandAllocator, device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&fr->commandAllocator)));
-    ExitIfFailed(CALL(CreateCommandAllocator, device, D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&fr->bundleAllocator)));
+    LogAndExit(CALL(CreateCommandAllocator, device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&fr->commandAllocator)));
+    LogAndExit(CALL(CreateCommandAllocator, device, D3D12_COMMAND_LIST_TYPE_BUNDLE, IID_PPV_ARGS(&fr->bundleAllocator)));
 
     D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
     D3D12_RESOURCE_DESC uploadBuffer = CD3DX12_RESOURCE_DESC_BUFFER(sizeof(SceneConstantBuffer) * fr->cityRowCount * fr->cityColumnCount, D3D12_RESOURCE_FLAG_NONE, 0);
     // Create an upload heap for the constant buffers.
-    ExitIfFailed(CALL(CreateCommittedResource, device, 
+    LogAndExit(CALL(CreateCommittedResource, device, 
         &uploadHeap,
         D3D12_HEAP_FLAG_NONE,
         &uploadBuffer,
@@ -55,7 +55,7 @@ void FrameResource_Init(FrameResource* const fr, ID3D12Device* const device, UIN
     // the resource stays 'permenantly' mapped to avoid overhead with 
     // mapping/unmapping each frame.
     const D3D12_RANGE readRange = (D3D12_RANGE){ .Begin = 0, .End = 0 }; // We do not intend to read from this resource on the CPU
-    ExitIfFailed(CALL(Map, fr->cbvUploadHeap, 0, &readRange, (void**)(&fr->pConstantBuffers)));
+    LogAndExit(CALL(Map, fr->cbvUploadHeap, 0, &readRange, (void**)(&fr->pConstantBuffers)));
 
     // Update all of the model matrices once; our cities don't move so 
     // we don't need to do this ever again.
@@ -75,11 +75,11 @@ void FrameResource_InitBundle(FrameResource* const fr,
     ID3D12DescriptorHeap* const samplerDescriptorHeap,
     ID3D12RootSignature* const rootSignature)
 {
-    ExitIfFailed(CALL(CreateCommandList, device, 0, D3D12_COMMAND_LIST_TYPE_BUNDLE, fr->bundleAllocator, pso1, IID_PPV_ARGS(&fr->bundle)));
+    LogAndExit(CALL(CreateCommandList, device, 0, D3D12_COMMAND_LIST_TYPE_BUNDLE, fr->bundleAllocator, pso1, IID_PPV_ARGS(&fr->bundle)));
     NAME_D3D12_OBJECT(fr->bundle);
     FrameResource_PopulateCommandList(fr, fr->bundle, pso1, pso2, frameResourceIndex, numIndices, indexBufferViewDesc,
         vertexBufferViewDesc, cbvSrvDescriptorHeap, cbvSrvDescriptorSize, samplerDescriptorHeap, rootSignature);
-    ExitIfFailed(CALL(Close, fr->bundle));
+    LogAndExit(CALL(Close, fr->bundle));
 }
 
 void FrameResource_PopulateCommandList(FrameResource* const fr,
