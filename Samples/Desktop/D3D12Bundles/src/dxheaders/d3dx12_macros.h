@@ -1,7 +1,7 @@
 #pragma once
 
 // A problem is that many of these IID are in different headers, but to use this macro, all of them should be included
-#define __extractIID(X) _Generic((X), \
+#define __IID(X) _Generic((X), \
               ID3D12Device **: &IID_ID3D12Device, \
               ID3D12Debug **: &IID_ID3D12Debug, \
               IDXGIAdapter1 **: &IID_IDXGIAdapter1, \
@@ -23,7 +23,7 @@
               ID3D12Object **: &IID_ID3D12Object, \
               ID3D12Fence **: &IID_ID3D12Fence)
 
-#define IID_PPV_ARGS(ppType) __extractIID(ppType), (void**)(ppType)
+#define IID_PPV_ARGS(ppType) __IID(ppType), (void**)(ppType)
 
 // The ## __VA_ARGS__ is not portable, being a GCC extension https://gcc.gnu.org/onlinedocs/gcc/Variadic-Macros.html
 // But apparently, it also works in MSVC as well

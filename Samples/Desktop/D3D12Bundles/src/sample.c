@@ -62,13 +62,17 @@ void Sample_Destroy(DXSample* const sample)
 	// cleaned up by the destructor.
 	{
 		const UINT64 fenceValue = sample->fenceValue;
-		const UINT64 lastCompletedFence = CALL(GetCompletedValue, sample->fence);
+		const UINT64 lastCompletedFence = ID3D12Fence_GetCompletedValue(sample->fence);
+		
 		// Signal and increment the fence value.
-		LogAndExit(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
+		HRESULT hr = ID3D12CommandQueue_Signal(sample->commandQueue, sample->fence, sample->fenceValue);
+		if(FAILED(hr)) LogAndExit(hr);
+
 		// Wait until the previous frame is finished.
 		if (lastCompletedFence < fenceValue)
 		{
-			LogAndExit(CALL(SetEventOnCompletion, sample->fence, fenceValue, sample->fenceEvent));
+			hr = ID3D12Fence_SetEventOnCompletion(sample->fence, fenceValue, sample->fenceEvent);
+			if (FAILED(hr)) LogAndExit(hr);
 			WaitForSingleObject(sample->fenceEvent, INFINITE);
 		}
 	}
@@ -98,7 +102,7 @@ void Sample_Update(DXSample* const sample) {
 
 	// Get current GPU progress against submitted workload. Resources still scheduled 
 	// for GPU execution cannot be modified or else undefined behavior will result.
-	const UINT64 lastCompletedFence = CALL(GetCompletedValue, sample->fence);
+	const UINT64 lastCompletedFence = ID3D12Fence_GetCompletedValue(sample->fence);
 
 	// Move to the next frame resource.
 	sample->currentFrameResourceIndex = (sample->currentFrameResourceIndex + 1) % FrameCount;
@@ -108,7 +112,8 @@ void Sample_Update(DXSample* const sample) {
 	// If it is, wait for it to complete.
 	if (sample->currFrameResource->fenceValue != 0 && sample->currFrameResource->fenceValue > lastCompletedFence)
 	{
-		LogAndExit(CALL(SetEventOnCompletion, sample->fence, sample->currFrameResource->fenceValue, sample->fenceEvent));
+		HRESULT hr = ID3D12Fence_SetEventOnCompletion(sample->fence, sample->currFrameResource->fenceValue, sample->fenceEvent);
+		if(FAILED(hr)) LogAndExit(hr);
 		WaitForSingleObject(sample->fenceEvent, INFINITE);
 	}
 
@@ -193,7 +198,8 @@ static void LoadPipeline(DXSample* const sample)
 
 	D3D12_COMMAND_QUEUE_DESC queueDesc = { .Flags = D3D12_COMMAND_QUEUE_FLAG_NONE, .Type = D3D12_COMMAND_LIST_TYPE_DIRECT };
 	ID3D12CommandQueue* commandQueue = NULL;
-	LogAndExit(CALL(CreateCommandQueue, sample->device, &queueDesc, IID_PPV_ARGS(&sample->commandQueue)));
+	hr = ID3D12Device_CreateCommandQueue(sample->device, &queueDesc, __IID(&sample->commandQueue), (void**)(&sample->commandQueue));
+	if (FAILED(hr)) LogAndExit(hr);
 
 	/* Create swap chain */
 
@@ -208,23 +214,28 @@ static void LoadPipeline(DXSample* const sample)
 	};
 
 	IUnknown* commandQueueAsIUnknown = NULL;
-	LogAndExit(CAST(sample->commandQueue, commandQueueAsIUnknown));
+	hr = CAST(sample->commandQueue, commandQueueAsIUnknown);
+	if(FAILED(hr))	LogAndExit(hr);
+
 	IDXGISwapChain1* swapChainAsSwapChain1 = NULL;
-	LogAndExit(CALL(CreateSwapChainForHwnd,
-		factory,
+	hr = IDXGIFactory4_CreateSwapChainForHwnd(factory,
 		commandQueueAsIUnknown,        // Swap chain needs the queue so that it can force a flush on it
 		G_HWND,
 		&swapChainDesc,
 		NULL,
 		NULL,
-		&swapChainAsSwapChain1
-	));
-	RELEASE(commandQueueAsIUnknown);
-	LogAndExit(CAST(swapChainAsSwapChain1, sample->swapChain));
-	RELEASE(swapChainAsSwapChain1);
+		&swapChainAsSwapChain1);
+	if(FAILED(hr)) LogAndExit(hr);
 
-	LogAndExit(CALL(MakeWindowAssociation, factory, G_HWND, DXGI_MWA_NO_ALT_ENTER));
-	sample->frameIndex = CALL(GetCurrentBackBufferIndex, sample->swapChain);
+	RELEASE(commandQueueAsIUnknown);
+	
+	hr = CAST(swapChainAsSwapChain1, sample->swapChain);
+	if(FAILED(hr)) LogAndExit(hr);
+	RELEASE(swapChainAsSwapChain1);
+	hr = IDXGIFactory4_MakeWindowAssociation(factory, G_HWND, DXGI_MWA_NO_ALT_ENTER);
+	if(FAILED(hr)) LogAndExit(hr);
+
+	sample->frameIndex = IDXGISwapChain3_GetCurrentBackBufferIndex(sample->swapChain);
 
 	/* Create descriptor heaps (3 RTVs, 1 DSV, 1 SRV, many CBVs for resources and a Sampler in this example) */
 	{
@@ -234,8 +245,10 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE
 		};
-		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &rtvHeapDesc, IID_PPV_ARGS(&sample->rtvHeap)));
-		sample->rtvDescriptorSize = CALL(GetDescriptorHandleIncrementSize, sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		hr = ID3D12Device_CreateDescriptorHeap(sample->device, &rtvHeapDesc, __IID(&sample->rtvHeap), (void**)&sample->rtvHeap);
+		if (FAILED(hr)) LogAndExit(hr);
+
+		sample->rtvDescriptorSize = ID3D12Device_GetDescriptorHandleIncrementSize(sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		// DSV
 		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {
@@ -243,7 +256,8 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE
 		};
-		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &dsvHeapDesc, IID_PPV_ARGS(&sample->dsvHeap)));
+		hr = ID3D12Device_CreateDescriptorHeap(sample->device, &dsvHeapDesc, __IID(&sample->dsvHeap), (void**)&sample->dsvHeap);
+		if (FAILED(hr)) LogAndExit(hr);
 
 		// SRV and CBV
 		D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {
@@ -253,8 +267,10 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
 		};
-		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &cbvSrvHeapDesc, IID_PPV_ARGS(&sample->cbvSrvHeap)));
-		sample->cbvSrvDescriptorSize = CALL(GetDescriptorHandleIncrementSize, sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		hr = ID3D12Device_CreateDescriptorHeap(sample->device, &cbvSrvHeapDesc, __IID(&sample->cbvSrvHeap), (void**)&sample->cbvSrvHeap);
+		if(FAILED(hr)) LogAndExit(hr);
+
+		sample->cbvSrvDescriptorSize = ID3D12Device_GetDescriptorHandleIncrementSize(sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		NAME_D3D12_OBJECT(sample->cbvSrvHeap);
 
@@ -264,10 +280,12 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
 		};
-		LogAndExit(CALL(CreateDescriptorHeap, sample->device, &samplerHeapDesc, IID_PPV_ARGS(&sample->samplerHeap)));
+		hr = ID3D12Device_CreateDescriptorHeap(sample->device, &samplerHeapDesc, __IID(&sample->samplerHeap), (void**)&sample->samplerHeap);
+		if(FAILED(hr)) LogAndExit(hr);
 	}
 
-	LogAndExit(CALL(CreateCommandAllocator, sample->device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&sample->commandAllocator)));
+	hr = ID3D12Device_CreateCommandAllocator(sample->device, D3D12_COMMAND_LIST_TYPE_DIRECT, __IID(&sample->commandAllocator), (void**)&sample->commandAllocator);
+	if(FAILED(hr)) LogAndExit(hr);
 	RELEASE(factory);
 }
 
@@ -285,7 +303,7 @@ static void LoadAssets(DXSample* const sample)
 		// This is the highest version the sample supports. 
 		// If CheckFeatureSupport succeeds, the HighestVersion returned will not be greater than this.
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = { .HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1 };
-		if (FAILED(CALL(CheckFeatureSupport, sample->device, D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		if (FAILED(ID3D12Device_CheckFeatureSupport(sample->device, D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 		{
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 		}
@@ -320,9 +338,10 @@ static void LoadAssets(DXSample* const sample)
 		ID3DBlob* error = NULL;
 
 		LogAndExit(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
-		const LPVOID bufferPointer = CALL(GetBufferPointer, signature);
-		const SIZE_T bufferSize = CALL(GetBufferSize, signature);
-		LogAndExit(CALL(CreateRootSignature, sample->device, 0, bufferPointer, bufferSize, IID_PPV_ARGS(&sample->rootSignature)));
+		const LPVOID bufferPointer = ID3D10Blob_GetBufferPointer(signature);
+		const SIZE_T bufferSize = ID3D10Blob_GetBufferSize(signature);
+		HRESULT hr = ID3D12Device_CreateRootSignature(sample->device, 0, bufferPointer, bufferSize, __IID(&sample->rootSignature), (void**)&sample->rootSignature);
+		if (FAILED(hr)) LogAndExit(hr);
 	}
 
 	/* Create the pipeline state, which includes loading shaders */
@@ -367,8 +386,8 @@ static void LoadAssets(DXSample* const sample)
 			.DSVFormat = DXGI_FORMAT_D32_FLOAT,
 			.SampleDesc.Count = 1,
 		};
-
-		LogAndExit(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState1)));
+		HRESULT hr = ID3D12Device_CreateGraphicsPipelineState(sample->device, &psoDesc, __IID(&sample->pipelineState1), (void**)&sample->pipelineState1);
+		if(FAILED(hr)) LogAndExit(hr);
 		NAME_D3D12_OBJECT(sample->pipelineState1);
 
 		// Modify the description to use an alternate pixel shader and create a second PSO.
@@ -376,7 +395,8 @@ static void LoadAssets(DXSample* const sample)
 				.pShaderBytecode = pPixelShaderData2,
 				.BytecodeLength = pixelShaderDataLength2,
 		};
-		LogAndExit(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState2)));
+		hr = ID3D12Device_CreateGraphicsPipelineState(sample->device, &psoDesc, __IID(&sample->pipelineState2), (void**)&sample->pipelineState2);
+		if (FAILED(hr)) LogAndExit(hr);
 		NAME_D3D12_OBJECT(sample->pipelineState2);
 
 		CleanAllocatedDataFromFile(pVertexShaderData);
@@ -385,23 +405,24 @@ static void LoadAssets(DXSample* const sample)
 	}
 
 	/* Create the command list */
-
-	LogAndExit(CALL(CreateCommandList, sample->device, 
-		0, 
-		D3D12_COMMAND_LIST_TYPE_DIRECT, 
-		sample->commandAllocator, 
+	HRESULT hr = ID3D12Device_CreateCommandList(sample->device,
+		0,
+		D3D12_COMMAND_LIST_TYPE_DIRECT,
+		sample->commandAllocator,
 		NULL, 
-		IID_PPV_ARGS(&sample->commandList))
-	);
+		__IID(&sample->commandList),
+		(void**)&sample->commandList);
+	if (FAILED(hr)) LogAndExit(hr);
 	NAME_D3D12_OBJECT(sample->commandList);
 
 	// Create render target views (RTVs).
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
-	CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvHandle);
+	ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->rtvHeap, &rtvHandle);
 	for (UINT i = 0; i < FrameCount; i++)
 	{
-		LogAndExit(CALL(GetBuffer, sample->swapChain, i, IID_PPV_ARGS(&sample->renderTargets[i])));
-		CALL(CreateRenderTargetView, sample->device, sample->renderTargets[i], NULL, rtvHandle);
+		hr = IDXGISwapChain3_GetBuffer(sample->swapChain, i, __IID(&sample->renderTargets[i]), (void**)&sample->renderTargets[i]);
+		if (FAILED(hr)) LogAndExit(hr);
+		ID3D12Device_CreateRenderTargetView(sample->device, sample->renderTargets[i], NULL, rtvHandle);
 		// walk an offset equivalent to one descriptor to go to next space to store the next RTV
 		rtvHandle.ptr += sample->rtvDescriptorSize;
 		NAME_D3D12_OBJECT_INDEXED(sample->renderTargets, i);
@@ -415,26 +436,28 @@ static void LoadAssets(DXSample* const sample)
 	{
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		D3D12_RESOURCE_DESC vertexBufferDesc = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_VERTEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		hr = ID3D12Device_CreateCommittedResource(sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&vertexBufferDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			NULL,
-			IID_PPV_ARGS(&sample->vertexBuffer))
-		);
+			__IID(&sample->vertexBuffer),
+			(void**)&sample->vertexBuffer);
+		if (FAILED(hr)) LogAndExit(hr);
 
 		D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC vertexBufferDescUpload = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_VERTEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		
+		hr = ID3D12Device_CreateCommittedResource(sample->device,
 			&uploadHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&vertexBufferDescUpload,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			NULL,
-			IID_PPV_ARGS(&vertexBufferUploadHeap))
-		);
-
+			__IID(&vertexBufferUploadHeap),
+			(void**)&vertexBufferUploadHeap);
+		if (FAILED(hr)) LogAndExit(hr);
 		NAME_D3D12_OBJECT(sample->vertexBuffer);
 
 		// Copy data to the intermediate upload heap and then schedule a copy 
@@ -448,10 +471,10 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_RESOURCE_BARRIER transitionCopyDestToVertexBuffer = CD3DX12_DefaultTransition(sample->vertexBuffer,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		CALL(ResourceBarrier, sample->commandList, 1, &transitionCopyDestToVertexBuffer);
+		ID3D12GraphicsCommandList_ResourceBarrier(sample->commandList, 1, &transitionCopyDestToVertexBuffer);
 
 		// Initialize the vertex buffer view.
-		sample->vertexBufferView.BufferLocation = CALL(GetGPUVirtualAddress, sample->vertexBuffer);
+		sample->vertexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(sample->vertexBuffer);
 		sample->vertexBufferView.StrideInBytes = SampleAssets_STANDARD_VERTEX_STRIDE;
 		sample->vertexBufferView.SizeInBytes = SampleAssets_VERTEX_DATA_SIZE;
 	}
@@ -460,25 +483,28 @@ static void LoadAssets(DXSample* const sample)
 	{
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		D3D12_RESOURCE_DESC indexBufferDesc = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_INDEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		ID3D12Device_CreateCommittedResource(sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&indexBufferDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST,
-			NULL,
-			IID_PPV_ARGS(&sample->indexBuffer)));
-
+			NULL, 
+			__IID(&sample->indexBuffer),
+			(void**)&sample->indexBuffer);
+		if (FAILED(hr)) LogAndExit(hr);
+		
 		D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC indexBufferDescUpload = CD3DX12_RESOURCE_DESC_BUFFER(SampleAssets_INDEX_DATA_SIZE, D3D12_RESOURCE_FLAG_NONE, 0);
 
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		hr = ID3D12Device_CreateCommittedResource(sample->device,
 			&uploadHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&indexBufferDescUpload,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
-			NULL,
-			IID_PPV_ARGS(&indexBufferUploadHeap)));
-
+			NULL, 
+			__IID(&indexBufferUploadHeap),
+			(void**)&indexBufferUploadHeap);
+		if (FAILED(hr)) LogAndExit(hr);
 		NAME_D3D12_OBJECT(sample->indexBuffer);
 
 		// Copy data to the intermediate upload heap and then schedule a copy 
@@ -493,10 +519,10 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_RESOURCE_BARRIER transitionCopyDestToIndexBuffer = CD3DX12_DefaultTransition(sample->indexBuffer,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_INDEX_BUFFER);
-		CALL(ResourceBarrier, sample->commandList, 1, &transitionCopyDestToIndexBuffer);
+		ID3D12GraphicsCommandList_ResourceBarrier(sample->commandList, 1, &transitionCopyDestToIndexBuffer);
 
 		// Describe the index buffer view.
-		sample->indexBufferView.BufferLocation = CALL(GetGPUVirtualAddress, sample->indexBuffer);
+		sample->indexBufferView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(sample->indexBuffer);;
 		sample->indexBufferView.Format = SampleAssets_STANDARD_INDEX_FORMAT;
 		sample->indexBufferView.SizeInBytes = SampleAssets_INDEX_DATA_SIZE;
 
@@ -518,28 +544,30 @@ static void LoadAssets(DXSample* const sample)
 			.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
 		};
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		ID3D12Device_CreateCommittedResource(sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&textureDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			NULL,
-			IID_PPV_ARGS(&sample->texture))
-		);
+			__IID(&sample->texture),
+			(void**)&sample->texture);
+		if (FAILED(hr)) LogAndExit(hr);
 		NAME_D3D12_OBJECT(sample->texture);
 
 		const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
 		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(sample->texture, 0, subresourceCount);
 		D3D12_HEAP_PROPERTIES uploadHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC uploadBuffer = CD3DX12_RESOURCE_DESC_BUFFER(uploadBufferSize, D3D12_RESOURCE_FLAG_NONE, 0);
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		hr = ID3D12Device_CreateCommittedResource(sample->device,
 			&uploadHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&uploadBuffer,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			NULL,
-			IID_PPV_ARGS(&textureUploadHeap))
-		);
+			__IID(&textureUploadHeap),
+			(void**)&textureUploadHeap);
+		if (FAILED(hr)) LogAndExit(hr);
 
 		// Copy data to the intermediate upload heap and then schedule a copy 
 		// from the upload heap to the Texture2D.
@@ -554,7 +582,7 @@ static void LoadAssets(DXSample* const sample)
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
 		);
-		CALL(ResourceBarrier, sample->commandList, 1, &fromCopyToPixelShaderResource);
+		ID3D12GraphicsCommandList_ResourceBarrier(sample->commandList, 1, &fromCopyToPixelShaderResource);
 
 		// Describe and create a sampler.
 		D3D12_SAMPLER_DESC samplerDesc = {
@@ -569,9 +597,8 @@ static void LoadAssets(DXSample* const sample)
 			.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS,
 		};
 		D3D12_CPU_DESCRIPTOR_HANDLE samplerHandle;
-		CALL(GetCPUDescriptorHandleForHeapStart, sample->samplerHeap, &samplerHandle);
-		CALL(CreateSampler, sample->device, &samplerDesc, samplerHandle);
-
+		ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->samplerHeap, &samplerHandle);
+		ID3D12Device_CreateSampler(sample->device, &samplerDesc, samplerHandle);
 
 		// Describe and create a SRV for the texture.
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {
@@ -582,8 +609,8 @@ static void LoadAssets(DXSample* const sample)
 		};
 		// SRV will be the first
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvHandle;
-		CALL(GetCPUDescriptorHandleForHeapStart, sample->cbvSrvHeap, &cbvSrvHandle);
-		CALL(CreateShaderResourceView, sample->device, sample->texture, &srvDesc, cbvSrvHandle);
+		ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->cbvSrvHeap, &cbvSrvHandle);
+		ID3D12Device_CreateShaderResourceView(sample->device, sample->texture, &srvDesc, cbvSrvHandle);
 	}
 
 	CleanAllocatedDataFromFile(pMeshData);
@@ -604,33 +631,39 @@ static void LoadAssets(DXSample* const sample)
 		D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		D3D12_RESOURCE_DESC texDesc = CD3DX12_TEX2D(DXGI_FORMAT_D32_FLOAT, sample->width, sample->height, 
 			1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
-		LogAndExit(CALL(CreateCommittedResource, sample->device,
+		hr = ID3D12Device_CreateCommittedResource(sample->device,
 			&defaultHeap,
 			D3D12_HEAP_FLAG_NONE,
 			&texDesc,
 			D3D12_RESOURCE_STATE_DEPTH_WRITE,
-			&depthOptimizedClearValue,
-			IID_PPV_ARGS(&sample->depthStencil)
-		));
-
+			&depthOptimizedClearValue, 
+			__IID(&sample->depthStencil),
+			(void**)&sample->depthStencil);
+		if (FAILED(hr)) LogAndExit(hr);
 		NAME_D3D12_OBJECT(sample->depthStencil);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle;
-		CALL(GetCPUDescriptorHandleForHeapStart, sample->dsvHeap, &dsvHandle);
-		CALL(CreateDepthStencilView, sample->device, sample->depthStencil, &depthStencilDesc, dsvHandle);
+		ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->dsvHeap, &dsvHandle);
+		ID3D12Device_CreateDepthStencilView(sample->device, sample->depthStencil, &depthStencilDesc, dsvHandle);
 	}
 
 	// Close the command list and execute it to begin the initial GPU setup.
-	LogAndExit(CALL(Close, sample->commandList));
+	hr = ID3D12GraphicsCommandList_Close(sample->commandList);
+	if (FAILED(hr)) LogAndExit(hr);
 	ID3D12CommandList* asCommandList = NULL;
 	CAST(sample->commandList, asCommandList);
 	ID3D12CommandList* ppCommandLists[] = { asCommandList };
-	CALL(ExecuteCommandLists, sample->commandQueue, _countof(ppCommandLists), ppCommandLists);
+	ID3D12CommandQueue_ExecuteCommandLists(sample->commandQueue, _countof(ppCommandLists), ppCommandLists);
 	RELEASE(asCommandList);
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
-		LogAndExit(CALL(CreateFence, sample->device, sample->fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&sample->fence)));
+		hr = ID3D12Device_CreateFence(sample->device,
+			sample->fenceValue,
+			D3D12_FENCE_FLAG_NONE,
+			__IID(&sample->fence),
+			(void**)&sample->fence);
+		if (FAILED(hr)) LogAndExit(hr);
 		sample->fenceValue++;
 
 		// Create an event handle to use for frame synchronization.
@@ -646,11 +679,13 @@ static void LoadAssets(DXSample* const sample)
 
 		// Signal and increment the fence value.
 		const UINT64 fenceToWaitFor = sample->fenceValue;
-		LogAndExit(CALL(Signal, sample->commandQueue, sample->fence, fenceToWaitFor));
+		hr = ID3D12CommandQueue_Signal(sample->commandQueue, sample->fence, fenceToWaitFor);
+		if(FAILED(hr)) LogAndExit(hr);
 		sample->fenceValue++;
 
 		// Wait until the fence is completed.
-		LogAndExit(CALL(SetEventOnCompletion, sample->fence, fenceToWaitFor, sample->fenceEvent));
+		hr = ID3D12Fence_SetEventOnCompletion(sample->fence, fenceToWaitFor, sample->fenceEvent);
+		if(FAILED(hr)) LogAndExit(hr);
 		WaitForSingleObject(sample->fenceEvent, INFINITE);
 	}
 
@@ -666,43 +701,47 @@ static void PopulateCommandList(DXSample* const sample)
 	// Command list allocators can only be reset when the associated
 	// command lists have finished execution on the GPU; apps should use
 	// fences to determine GPU execution progress.
-	LogAndExit(CALL(Reset, sample->currFrameResource->commandAllocator));
+	HRESULT hr = ID3D12CommandAllocator_Reset(sample->currFrameResource->commandAllocator);
+	if(FAILED(hr)) LogAndExit(hr);
 
 	// However, when ExecuteCommandList() is called on a particular command
 	// list, that command list can then be reset at any time and must be before
 	// re-recording.
-	LogAndExit(CALL(Reset, sample->commandList, sample->currFrameResource->commandAllocator, sample->pipelineState1));
+	hr = ID3D12GraphicsCommandList_Reset(sample->commandList, 
+		sample->currFrameResource->commandAllocator, 
+		sample->pipelineState1);
+	if (FAILED(hr)) LogAndExit(hr);
 
 	// Set necessary state.
-	CALL(SetGraphicsRootSignature, sample->commandList, sample->rootSignature);
+	ID3D12GraphicsCommandList_SetGraphicsRootSignature(sample->commandList, sample->rootSignature);
 
 	ID3D12DescriptorHeap* ppHeaps[] = { sample->cbvSrvHeap, sample->samplerHeap };
-	CALL(SetDescriptorHeaps, sample->commandList, _countof(ppHeaps), ppHeaps);
-	CALL(RSSetViewports, sample->commandList, 1, &sample->viewport);
-	CALL(RSSetScissorRects, sample->commandList, 1, &sample->scissorRect);
+	ID3D12GraphicsCommandList_SetDescriptorHeaps(sample->commandList, _countof(ppHeaps), ppHeaps);
+	ID3D12GraphicsCommandList_RSSetViewports(sample->commandList, 1, &sample->viewport);
+	ID3D12GraphicsCommandList_RSSetScissorRects(sample->commandList, 1, &sample->scissorRect);
 
 	// Indicate that the back buffer will be used as a render target.
 	const D3D12_RESOURCE_BARRIER transitionBarrierRT = CD3DX12_DefaultTransition(sample->renderTargets[sample->frameIndex],
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
-	CALL(ResourceBarrier, sample->commandList, 1, &transitionBarrierRT);
+	ID3D12GraphicsCommandList_ResourceBarrier(sample->commandList, 1, &transitionBarrierRT);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvCPUHandle;
-	CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvCPUHandle);
+	ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->rtvHeap, &rtvCPUHandle);
 	rtvCPUHandle.ptr = (SIZE_T)((INT64)rtvCPUHandle.ptr + ((INT64)sample->frameIndex) * ((INT64)sample->rtvDescriptorSize));
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvCPUHandle;
-	CALL(GetCPUDescriptorHandleForHeapStart, sample->dsvHeap, &dsvCPUHandle);
-	CALL(OMSetRenderTargets, sample->commandList, 1, &rtvCPUHandle, FALSE, &dsvCPUHandle);
+	ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->dsvHeap, &dsvCPUHandle);
+	ID3D12GraphicsCommandList_OMSetRenderTargets(sample->commandList, 1, &rtvCPUHandle, FALSE, &dsvCPUHandle);
 
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	CALL(ClearRenderTargetView, sample->commandList, rtvCPUHandle, clearColor, 0, NULL);
-	CALL(ClearDepthStencilView, sample->commandList, dsvCPUHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
+	ID3D12GraphicsCommandList_ClearRenderTargetView(sample->commandList, rtvCPUHandle, clearColor, 0, NULL);
+	ID3D12GraphicsCommandList_ClearDepthStencilView(sample->commandList, dsvCPUHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
 
 	if (UseBundles)
 	{
 		// Execute the prebuilt bundle.
-		CALL(ExecuteBundle, sample->commandList, sample->currFrameResource->bundle);
+		ID3D12GraphicsCommandList_ExecuteBundle(sample->commandList, sample->currFrameResource->bundle);
 	}
 	else
 	{
@@ -726,15 +765,16 @@ static void PopulateCommandList(DXSample* const sample)
 	const D3D12_RESOURCE_BARRIER transitionBarrierRTtoPresent = CD3DX12_DefaultTransition(sample->renderTargets[sample->frameIndex],
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_PRESENT);
-	CALL(ResourceBarrier, sample->commandList, 1, &transitionBarrierRTtoPresent);
-	LogAndExit(CALL(Close, sample->commandList));
+	ID3D12GraphicsCommandList_ResourceBarrier(sample->commandList, 1, &transitionBarrierRTtoPresent);
+	hr = ID3D12GraphicsCommandList_Close(sample->commandList);
+	if (FAILED(hr)) LogAndExit(hr);
 }
 
 // Create the resources that will be used every frame.
 static void CreateFrameResources(DXSample* const sample)
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE cbvSrvHandle;
-	CALL(GetCPUDescriptorHandleForHeapStart, sample->cbvSrvHeap, &cbvSrvHandle);
+	ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->cbvSrvHeap, &cbvSrvHandle);
 	// Start offseted one descriptor size, to move past the SRV in slot 1
 	cbvSrvHandle.ptr = (SIZE_T)(((INT64)cbvSrvHandle.ptr) + ((INT64)sample->cbvSrvDescriptorSize));
 
@@ -749,14 +789,14 @@ static void CreateFrameResources(DXSample* const sample)
 		{
 			for (UINT col = 0; col < CityColumnCount; col++)
 			{
-				D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress = CALL(GetGPUVirtualAddress, pFrameResource->cbvUploadHeap);
+				D3D12_GPU_VIRTUAL_ADDRESS gpuVirtualAddress = ID3D12Resource_GetGPUVirtualAddress(pFrameResource->cbvUploadHeap);
 				// Describe and create a constant buffer view (CBV).
 				D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {
 					.BufferLocation = gpuVirtualAddress + cbOffset,
 					.SizeInBytes = sizeof(SceneConstantBuffer),
 				};
 				cbOffset += cbvDesc.SizeInBytes;
-				CALL(CreateConstantBufferView, sample->device, &cbvDesc, cbvSrvHandle);
+				ID3D12Device_CreateConstantBufferView(sample->device, & cbvDesc, cbvSrvHandle);
 				cbvSrvHandle.ptr = (SIZE_T)(((INT64)cbvSrvHandle.ptr) + ((INT64)sample->cbvSrvDescriptorSize));
 			}
 		}
