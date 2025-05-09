@@ -69,12 +69,12 @@ static inline  UINT64 DoUpdateSubresources(
 {
     // Minor validation
 #if !defined(_WIN32)
-    const D3D12_RESOURCE_DESC* IntermediateDesc = CALL(GetDesc, pIntermediate);
+    const D3D12_RESOURCE_DESC* IntermediateDesc = ID3D12Resource_GetDesc(pIntermediate);
     const D3D12_RESOURCE_DESC* DestinationDesc = CALL(GetDesc, pDestinationResource);
 #else
     D3D12_RESOURCE_DESC tmpDesc1, tmpDesc2;
-    const D3D12_RESOURCE_DESC* IntermediateDesc = __CALL(GetDesc, pIntermediate, &tmpDesc1);
-    const D3D12_RESOURCE_DESC* DestinationDesc = __CALL(GetDesc, pDestinationResource, &tmpDesc2);
+    const D3D12_RESOURCE_DESC* IntermediateDesc = ID3D12Resource_GetDesc(pIntermediate, &tmpDesc1);
+    const D3D12_RESOURCE_DESC* DestinationDesc = ID3D12Resource_GetDesc(pDestinationResource, &tmpDesc2);
 #endif
     if (IntermediateDesc->Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||    // the intermediate should always be a buffer
         IntermediateDesc->Width < RequiredSize + pLayouts[0].Offset ||       // capable of storing the required destination data
@@ -87,7 +87,7 @@ static inline  UINT64 DoUpdateSubresources(
 
     // bytes on intermediate 
     BYTE* pData;
-    HRESULT hr = __CALL(Map, pIntermediate, 0, NULL, (void**)(&pData));
+    HRESULT hr = ID3D12Resource_Map(pIntermediate, 0, NULL, (void**)(&pData));
     if (FAILED(hr))
     {
         return 0;
@@ -110,12 +110,12 @@ static inline  UINT64 DoUpdateSubresources(
             pLayouts[subresourceIdx].Footprint.Depth
         );
     }
-    __CALL(Unmap, pIntermediate, 0, NULL);
+    ID3D12Resource_Unmap(pIntermediate, 0, NULL);
 
     // with data on the intermediate, now is time to send it to the destination
     if (DestinationDesc->Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
     {
-        __CALL(CopyBufferRegion, pCmdList, pDestinationResource, 0, pIntermediate, pLayouts[0].Offset, pLayouts[0].Footprint.Width);
+        ID3D12GraphicsCommandList_CopyBufferRegion(pCmdList, pDestinationResource, 0, pIntermediate, pLayouts[0].Offset, pLayouts[0].Footprint.Width);
     }
     else
     {
@@ -133,7 +133,7 @@ static inline  UINT64 DoUpdateSubresources(
                 .Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
                 .PlacedFootprint = pLayouts[i],
             };
-            __CALL(CopyTextureRegion, pCmdList, &Dst, 0, 0, 0, &Src, NULL);
+            ID3D12GraphicsCommandList_CopyTextureRegion(pCmdList, &Dst, 0, 0, 0, &Src, NULL);
         }
     }
     return RequiredSize;
@@ -171,15 +171,23 @@ static inline  UINT64 UpdateSubresources(
     UINT* pNumRows = (UINT*)(pRowSizesInBytes + NumSubresources);
 
 #if !defined(_WIN32)
-    const D3D12_RESOURCE_DESC* Desc = CALL(GetDesc, pDestinationResource);
+    const D3D12_RESOURCE_DESC* Desc = ID3D12Resource_GetDesc(pDestinationResource);
 #else
     D3D12_RESOURCE_DESC tmpDesc;
-    const D3D12_RESOURCE_DESC* Desc = __CALL(GetDesc, pDestinationResource, &tmpDesc);
+    const D3D12_RESOURCE_DESC* Desc = ID3D12Resource_GetDesc(pDestinationResource, &tmpDesc);
 #endif
     // retrive the footprint of the pDestinationResource. 
     ID3D12Device* pDevice = NULL;
-    __CALL(GetDevice, pDestinationResource, IID_PPV_ARGS(&pDevice));
-    __CALL(GetCopyableFootprints, pDevice, Desc, FirstSubresource, NumSubresources, IntermediateOffset, pLayouts, pNumRows, pRowSizesInBytes, &RequiredSize);
+    ID3D12Resource_GetDevice(pDestinationResource, __IID(&pDevice), (void**)&pDevice);
+    ID3D12Device_GetCopyableFootprints(pDevice, 
+        Desc, 
+        FirstSubresource, 
+        NumSubresources, 
+        IntermediateOffset, 
+        pLayouts, 
+        pNumRows, 
+        pRowSizesInBytes, 
+        &RequiredSize);
     RELEASE(pDevice);
 
     const UINT64 Result = DoUpdateSubresources(pCmdList, pDestinationResource, pIntermediate, FirstSubresource, NumSubresources, RequiredSize, pLayouts, pNumRows, pRowSizesInBytes, pSrcData);
@@ -197,17 +205,25 @@ static inline  UINT64 GetRequiredIntermediateSize(
     _In_range_(0, D3D12_REQ_SUBRESOURCES - FirstSubresource) UINT NumSubresources)
 {
 #if !defined(_WIN32)
-    const D3D12_RESOURCE_DESC* Desc = CALL(GetDesc, pDestinationResource);
+    const D3D12_RESOURCE_DESC* Desc = ID3D12Resource_GetDesc(pDestinationResource);
 #else
     D3D12_RESOURCE_DESC tmpDesc;
-    const D3D12_RESOURCE_DESC *Desc = __CALL(GetDesc, pDestinationResource, &tmpDesc);
+    const D3D12_RESOURCE_DESC *Desc = ID3D12Resource_GetDesc(pDestinationResource, &tmpDesc);
 #endif
     UINT64 RequiredSize = 0;
 
     ID3D12Device* pDevice = NULL;
-    __CALL(GetDevice, pDestinationResource, IID_PPV_ARGS(&pDevice));
+    ID3D12Resource_GetDevice(pDestinationResource, __IID(&pDevice), (void**)&pDevice);
     // Gets a resource layout of the subresources. Here only interested in the size footprint
-    __CALL(GetCopyableFootprints, pDevice, Desc, FirstSubresource, NumSubresources, 0, NULL, NULL, NULL, &RequiredSize);
+    ID3D12Device_GetCopyableFootprints(pDevice, 
+        Desc, 
+        FirstSubresource, 
+        NumSubresources, 
+        0, 
+        NULL, 
+        NULL, 
+        NULL, 
+        &RequiredSize);
     RELEASE(pDevice);
 
     return RequiredSize;
