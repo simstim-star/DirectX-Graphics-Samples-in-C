@@ -27,20 +27,20 @@
 
 // The ## __VA_ARGS__ is not portable, being a GCC extension https://gcc.gnu.org/onlinedocs/gcc/Variadic-Macros.html
 // But apparently, it also works in MSVC as well
-#define CALL(METHOD, CALLER, ...) CALLER->lpVtbl->METHOD(CALLER, ## __VA_ARGS__)
+#define __CALL(METHOD, CALLER, ...) CALLER->lpVtbl->METHOD(CALLER, ## __VA_ARGS__)
 
 // cast COM style
-#define CAST(from, to) CALL(QueryInterface, from, IID_PPV_ARGS(&to))
+#define CAST(from, to) __CALL(QueryInterface, from, IID_PPV_ARGS(&to))
 
 // Calls Release and makes the pointer NULL if RefCount reaches zero
 #define RELEASE(ptr) if(ptr && ptr->lpVtbl->Release(ptr) == 0) ptr = NULL
 
 // Assign a name to the object to aid with debugging.
 #if defined(_DEBUG) || defined(DBG)
-#define NAME_D3D12_OBJECT(x) CALL(SetName, x, L"" #x);                        
+#define NAME_D3D12_OBJECT(x) __CALL(SetName, x, L"" #x);                        
 #define NAME_D3D12_OBJECT_INDEXED(x, i)  {\
                 WCHAR fullName[50];\
-                if (swprintf_s(fullName, 50, L"%s[%u]", L"" #x, (UINT)i) > 0) CALL(SetName, x[i], fullName);\
+                if (swprintf_s(fullName, 50, L"%s[%u]", L"" #x, (UINT)i) > 0) __CALL(SetName, x[i], fullName);\
                }
 #else
 #define NAME_D3D12_OBJECT(x)

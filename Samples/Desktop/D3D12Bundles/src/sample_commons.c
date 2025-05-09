@@ -1,3 +1,5 @@
+#define COBJMACROS
+
 #include <stdio.h>
 #include "sample_commons.h"
 #include "d3d12.h"
@@ -54,11 +56,18 @@ void GetHardwareAdapter(
 	{
 		DXGI_GPU_PREFERENCE gpuPreference = requestHighPerformanceAdapter ? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED;
 		for (UINT adapterIndex = 0;
-			SUCCEEDED(CALL(EnumAdapterByGpuPreference, factory6, adapterIndex, gpuPreference, IID_PPV_ARGS(&adapter)));
+			SUCCEEDED(
+				IDXGIFactory6_EnumAdapterByGpuPreference(
+					factory6, 
+					adapterIndex, 
+					gpuPreference, 
+					__IID(&adapter), 
+					(void**) &adapter)
+				);
 			++adapterIndex)
 		{
 			DXGI_ADAPTER_DESC1 desc;
-			CALL(GetDesc1, adapter, &desc);
+			IDXGIAdapter1_GetDesc1(adapter, &desc);
 			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
 			{
 				// Don't select the Software adapter
@@ -80,10 +89,12 @@ void GetHardwareAdapter(
 	// Will enter here if your factory can't query a Factory6
 	if (adapter == NULL)
 	{
-		for (UINT adapterIndex = 0; SUCCEEDED(CALL(EnumAdapters1, pFactory, adapterIndex, &adapter)); ++adapterIndex)
+		for (UINT adapterIndex = 0; 
+			SUCCEEDED(IDXGIFactory1_EnumAdapters1(pFactory, adapterIndex, &adapter)); 
+			++adapterIndex)
 		{
 			DXGI_ADAPTER_DESC1 desc;
-			CALL(GetDesc1, adapter, &desc);
+			IDXGIAdapter1_GetDesc1(adapter, &desc);
 			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
 			{
 				// Don't select the Basic Render Driver adapter.
