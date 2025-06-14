@@ -7,7 +7,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 
 /* Only for anomalous exiting */
 static DXSample* __pSampleForCleanup = NULL;
-static void __cleanOnExit();
+static void __cleanOnExit(void);
 
 int Win32App_Run(DXSample* const pSample, const HINSTANCE hInstance, const int nCmdShow)
 {
@@ -110,7 +110,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
-static void __cleanOnExit() {
+static void __cleanOnExit(void) {
     if (__pSampleForCleanup) {
         Sample_AtExit(__pSampleForCleanup);
     }

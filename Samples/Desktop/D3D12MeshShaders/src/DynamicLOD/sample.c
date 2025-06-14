@@ -128,8 +128,8 @@ void Sample_Update(DXSample* const sample) {
 	{
 		// Update window text with FPS value.
 		wchar_t fps[64];
-		swprintf_s(fps, L"%ufps", sample->timer.framesPerSecond);
-		SetWindowText(G_HWND, fps);
+		swprintf_s(fps, 64, L"%ufps", sample->timer.framesPerSecond);
+		SetWindowTextW(G_HWND, fps);
 	}
 
 	SimpleCamera_Update(&sample->camera, TicksToSeconds(sample->timer.elapsedTicks));
@@ -508,10 +508,10 @@ static void LoadAssets(DXSample* const sample)
 		);
 		if (FAILED(hr)) LogErrAndExit(hr);
 
-		DXGI_FORMAT rtvFormat;
-		ID3D12Resource_GetDesc(sample->renderTargets[0], &rtvFormat);
-		DXGI_FORMAT depthStencilFormat;
-		ID3D12Resource_GetDesc(sample->depthStencil, &depthStencilFormat);
+		D3D12_RESOURCE_DESC rtvDesc;
+		ID3D12Resource_GetDesc(sample->renderTargets[0], &rtvDesc);
+		D3D12_RESOURCE_DESC depthStencilDesc;
+		ID3D12Resource_GetDesc(sample->depthStencil, &depthStencilDesc);
 
 		D3DX12_MESH_SHADER_PIPELINE_STATE_DESC  psoDesc = {
 			.pRootSignature = sample->rootSignature,
@@ -528,8 +528,8 @@ static void LoadAssets(DXSample* const sample)
 				.BytecodeLength = pixelShader.size,
 			},
 			.NumRenderTargets = 1,
-			.RTVFormats[0] = rtvFormat,
-			.DSVFormat = depthStencilFormat,
+			.RTVFormats[0] = rtvDesc.Format,
+			.DSVFormat = depthStencilDesc.Format,
 			.RasterizerState = CD3DX12_DEFAULT_RASTERIZER_DESC(),      // CW front; cull back
 			.BlendState = CD3DX12_DEFAULT_BLEND_DESC(),                // Opaque
 			.DepthStencilState = CD3DX12_DEFAULT_DEPTH_STENCIL_DESC(), // Less-equal depth test w/ writes; no stencil

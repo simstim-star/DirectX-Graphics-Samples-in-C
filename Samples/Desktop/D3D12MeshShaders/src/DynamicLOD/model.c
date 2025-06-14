@@ -502,7 +502,7 @@ HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const filename)
     return S_OK;
 }
 
-HRESULT Model_UploadGpuResources(Model *model, ID3D12Device* device, ID3D12CommandQueue* cmdQueue, ID3D12CommandAllocator* cmdAlloc, ID3D12GraphicsCommandList* cmdList)
+HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12CommandQueue* cmdQueue, ID3D12CommandAllocator* cmdAlloc, ID3D12GraphicsCommandList6* cmdList)
 {
     for (uint32_t i = 0; i < model->nMeshes; ++i)
     {
@@ -802,7 +802,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device* device, ID3D12Comma
         ID3D12GraphicsCommandList_Close(cmdList);
         
         ID3D12CommandList *asCmdList = NULL;
-        hr = ID3D12Object_QueryInterface(cmdList, &IID_ID3D12CommandList, asCmdList);
+        hr = ID3D12Object_QueryInterface(cmdList, &IID_ID3D12CommandList, (void**)asCmdList);
         if (FAILED(hr)) LogErrAndExit(hr);
         ID3D12CommandList* ppCommandLists[] = { asCmdList };
         ID3D12CommandQueue_ExecuteCommandLists(cmdQueue, 1, ppCommandLists);
@@ -837,4 +837,5 @@ uint32_t GetFormatSize(DXGI_FORMAT format)
     case DXGI_FORMAT_R32G32_FLOAT: return 8;
     case DXGI_FORMAT_R32_FLOAT: return 4;
     }
+    return 0;
 }

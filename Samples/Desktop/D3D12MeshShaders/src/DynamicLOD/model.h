@@ -244,4 +244,4 @@ typedef struct Model {
  *****************************************************************************************************************************/
 HRESULT Model_LoadFromFile(Model* const m, const wchar_t* filename);
 
-HRESULT Model_UploadGpuResources(Model *model, ID3D12Device* device, ID3D12CommandQueue* cmdQueue, ID3D12CommandAllocator* cmdAlloc, ID3D12GraphicsCommandList* cmdList);
+HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12CommandQueue* cmdQueue, ID3D12CommandAllocator* cmdAlloc, ID3D12GraphicsCommandList6* cmdList);
