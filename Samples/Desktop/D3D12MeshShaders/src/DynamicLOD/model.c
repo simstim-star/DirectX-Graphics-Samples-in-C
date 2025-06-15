@@ -802,7 +802,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
         ID3D12GraphicsCommandList_Close(cmdList);
         
         ID3D12CommandList *asCmdList = NULL;
-        hr = ID3D12Object_QueryInterface(cmdList, &IID_ID3D12CommandList, (void**)asCmdList);
+        hr = ID3D12Object_QueryInterface(cmdList, &IID_ID3D12CommandList, (void**)&asCmdList);
         if (FAILED(hr)) LogErrAndExit(hr);
         ID3D12CommandList* ppCommandLists[] = { asCmdList };
         ID3D12CommandQueue_ExecuteCommandLists(cmdQueue, 1, ppCommandLists);
