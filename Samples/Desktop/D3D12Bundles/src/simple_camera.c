@@ -49,9 +49,9 @@ void SimpleCamera_Update(SimpleCamera* camera, float elapsedSeconds)
     if (fabs(move.x) > 0.1f && fabs(move.z) > 0.1f)
     {
         XMVECTOR moveAsXMVECTOR = XMLoadFloat3(&move);
-        XMVECTOR vector = XMVector3Normalize(&moveAsXMVECTOR);
-        move.x = XMVectorGetX(&vector);
-        move.z = XMVectorGetZ(&vector);
+        XMVECTOR vector = XM_VEC3_NORM(moveAsXMVECTOR);
+        move.x = XM_VECX(vector);
+        move.z = XM_VECZ(vector);
     }
 
     float moveInterval = camera->moveSpeed * elapsedSeconds;
@@ -88,7 +88,7 @@ XMMATRIX SimpleCamera_GetViewMatrix(XMFLOAT3 pos, XMFLOAT3 lookDirection, XMFLOA
 	XMVECTOR EyePosition = XMLoadFloat3(&pos);
 	XMVECTOR EyeDirection = XMLoadFloat3(&lookDirection);
 	XMVECTOR UpDirection = XMLoadFloat3(&upDirection);
-    return XMMatrixLookToRH(&EyePosition, &EyeDirection, &UpDirection);
+    return XM_MAT_LOOK_RH(EyePosition, EyeDirection, UpDirection);
 }
 
 XMMATRIX SimpleCamera_GetProjectionMatrix(float fov, float aspectRatio, float nearPlane, float farPlane)

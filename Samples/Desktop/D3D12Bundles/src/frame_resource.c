@@ -20,8 +20,8 @@ static void SetCityPositions(FrameResource* const fr, FLOAT intervalCol, FLOAT i
         {
             FLOAT colOffset = col * intervalCol;
             // The y position ("up") is based off of the city's row and column position to prevent z-fighting.
-            XMMATRIX translated = XMMatrixTranslation(colOffset, CITY_SLOPE * (row * fr->cityColumnCount + col), rowOffset);
-            XMStoreFloat4x4(&fr->modelMatrices[row * fr->cityColumnCount + col], &translated);
+            XMMATRIX translated = XM_MAT_TRANSLATION(colOffset, CITY_SLOPE * (row * fr->cityColumnCount + col), rowOffset);
+            XM_STORE_FLOAT4X4(&fr->modelMatrices[row * fr->cityColumnCount + col], translated);
         }
     }
 }
