@@ -688,11 +688,6 @@ static void LoadAssets(DXSample* const sample)
 	}
 }
 
-// PAREI AQUI NA ADAPTACAO DO CODIGO OFICIAL
-// https://github.com/microsoft/DirectX-Graphics-Samples/blob/master/Samples/Desktop/D3D12MeshShaders/src/DynamicLOD/D3D12DynamicLOD.cpp#L453
-// ISSO TA LA EM CIMA NO Sample_Update E AINDA PRECISA IMPL UMAS COISAS EM MATH
-// NOTE QUE TBM EH BOM COLOCAR UMAS MACROS NO MATH PARA SIMPLIFICAR AS CALLS DE FUNC COM XM_1V ETC
-
 // Record all the commands we need to render the scene into the command list
 static void PopulateCommandList(DXSample* const sample)
 {
