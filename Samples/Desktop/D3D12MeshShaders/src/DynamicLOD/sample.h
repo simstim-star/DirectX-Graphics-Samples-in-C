@@ -19,6 +19,10 @@ extern const wchar_t*  c_ampShaderFilename;
 extern const wchar_t*  c_meshShaderFilename;
 extern const wchar_t*  c_pixelShaderFilename;
 
+typedef struct Constants Constants;
+typedef struct DrawParams DrawParams;
+typedef struct Instance Instance;
+
 enum RenderMode
 {
     Flat,

@@ -124,6 +124,8 @@ typedef struct Mesh
     Span_uint8_t              VerticesSpans[Attribute_Count];   // spans into the model buffer, where a span is a ptr to the start + num bytes in the span
     
     uint32_t                  VertexStrides[Attribute_Count];  // the stride is necessary to know how many bytes we need "to walk" to reach the next vertex
+
+    int                       numVerticesSpans;
     
     uint32_t                  VertexCount;    // this is the total number of vertices in the whole model, that is why it is a single value. 
                                                // in D3D12_VERTEX_BUFFER_VIEW, the SizeInBytes is calculated as VertexCount * VertexStride (if interleaved)
@@ -162,7 +164,7 @@ typedef struct Mesh
     *  D3D resource references *
     ****************************/
 
-    D3D12_VERTEX_BUFFER_VIEW*    VBViews;
+    D3D12_VERTEX_BUFFER_VIEW     VBViews[Attribute_Count];
     D3D12_INDEX_BUFFER_VIEW      IBView;
 
     ID3D12Resource*              VertexResources[Attribute_Count];

@@ -137,7 +137,7 @@ uint32_t Mesh_GetVertexIndex(Span_uint8_t UniqueVertexIndices, uint32_t index, u
 
 void ReleaseMesh(Mesh* m)
 {
-    for (int i = 0; i < Attribute_Count; ++i) RELEASE(m->VertexResources[i]);
+    for (int i = 0; i < m->numVerticesSpans; ++i) RELEASE(m->VertexResources[i]);
     RELEASE(m->IndexResource);
     RELEASE(m->MeshletResource);
     RELEASE(m->UniqueVertexIndexResource);
@@ -190,65 +190,63 @@ typedef struct MeshHeader
 
 HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const filename)
 {
+    wchar_t cwd[MAX_PATH];
+    GetCurrentDirectoryW(MAX_PATH, cwd);
+    wprintf(L"Working directory: %ls\n", cwd);
+
     FILE* file = _wfopen(filename, L"rb");
-    if (!file)
-    {
+    if (!file) {
         return E_INVALIDARG;
     }
 
+    // Read header
     FileHeader header;
-    size_t readSize = fread(&header, sizeof(header), 1, file);
-    if (readSize != sizeof(header))
+    if (fread(&header, sizeof(header), 1, file) != 1)
     {
         fclose(file);
         return E_FAIL;
     }
 
+    // Validate header
     if (header.Prolog != c_prolog || header.Version != CURRENT_FILE_VERSION)
     {
         fclose(file);
         return E_FAIL;
     }
 
-    /* Read each mesh header into memory */
-
+    // Read mesh headers
     size_t meshHeaderDataSize = header.MeshCount * sizeof(MeshHeader);
     MeshHeader* meshesHeaders = malloc(meshHeaderDataSize);
     if (!meshesHeaders)
     {
         fclose(file);
-        return E_FAIL; // Memory allocation failure
+        return E_FAIL;
     }
-
-    readSize = fread(meshesHeaders, sizeof(MeshHeader), header.MeshCount, file);
-    if (readSize != meshHeaderDataSize)
+    if (fread(meshesHeaders, sizeof(MeshHeader), header.MeshCount, file) != header.MeshCount)
     {
         free(meshesHeaders);
         fclose(file);
-        return E_FAIL; // Error reading mesh data
+        return E_FAIL;
     }
 
-    /* Read each accessor into memory */
-    
+    // Read accessors
     size_t accessorDataSize = header.AccessorCount * sizeof(Accessor);
     Accessor* accessors = malloc(accessorDataSize);
     if (!accessors)
     {
         free(meshesHeaders);
         fclose(file);
-        return E_FAIL; // Memory allocation failure
+        return E_FAIL;
     }
-    readSize = fread(accessors, sizeof(Accessor), header.AccessorCount, file);
-    if (readSize != accessorDataSize)
+    if (fread(accessors, sizeof(Accessor), header.AccessorCount, file) != header.AccessorCount)
     {
         free(meshesHeaders);
         free(accessors);
         fclose(file);
-        return E_FAIL; // Error reading accessor data
+        return E_FAIL;
     }
 
-    /* Read each bufferView into memory */
-
+    // Read buffer views
     size_t bufferViewDataSize = header.BufferViewCount * sizeof(BufferView);
     BufferView* bufferViews = malloc(bufferViewDataSize);
     if (!bufferViews)
@@ -256,44 +254,48 @@ HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const filename)
         free(meshesHeaders);
         free(accessors);
         fclose(file);
-        return E_FAIL; // Memory allocation failure
+        return E_FAIL;
     }
-    readSize = fread(bufferViews, sizeof(BufferView), header.BufferViewCount, file);
-    if (readSize != bufferViewDataSize)
+    if (fread(bufferViews, sizeof(BufferView), header.BufferViewCount, file) != header.BufferViewCount)
     {
         free(meshesHeaders);
         free(accessors);
         free(bufferViews);
         fclose(file);
-        return E_FAIL; // Error reading buffer view data
+        return E_FAIL;
     }
 
-    /* Read the model buffer into memory */
-
+    // Read model buffer
     m->buffer = malloc(header.BufferSize);
     if (!m->buffer)
     {
+        free(meshesHeaders);
+        free(accessors);
+        free(bufferViews);
         fclose(file);
-        return E_FAIL; // Memory allocation failure
+        return E_FAIL;
     }
-    readSize = fread(m->buffer, 1, header.BufferSize, file);
-    if (readSize != header.BufferSize)
+    if (fread(m->buffer, 1, header.BufferSize, file) != header.BufferSize)
     {
+        free(meshesHeaders);
+        free(accessors);
+        free(bufferViews);
         free(m->buffer);
         fclose(file);
-        return E_FAIL; // Error reading buffer data
+        return E_FAIL;
     }
 
-    /* Check if everything went right and close the file */
-
+    // Final EOF check
     char eofbyte;
-    readSize = fread(&eofbyte, 1, 1, file); // Read last byte to hit the eof bit
-    if (readSize != 1 || !feof(file))
+    size_t readSize = fread(&eofbyte, 1, 1, file);
+    if (readSize != 0 && !feof(file))  // readSize == 0 means expected EOF
     {
-        free(bufferViews);
         free(meshesHeaders);
+        free(accessors);
+        free(bufferViews);
+        free(m->buffer);
         fclose(file);
-        return E_FAIL; 
+        return E_FAIL;
     }
 
     fclose(file);
@@ -306,6 +308,7 @@ HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const filename)
     {
         MeshHeader* meshHeader = &meshesHeaders[ithMesh];
         Mesh* mesh = &m->meshes[ithMesh];
+        mesh->numVerticesSpans = 0;
 
         /* Load indices data */
         {
@@ -367,7 +370,8 @@ HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const filename)
             // init the mesh vertex data
             mesh->VertexStrides[jthAttribute] = accessor->Stride;
             mesh->VerticesSpans[jthAttribute] = vertsSpan;
-            mesh->VertexCount += vertsSpan.count / accessor->Stride;  // Assuming count of vertices as the total size / stride
+            mesh->VertexCount = vertsSpan.count / accessor->Stride;  // Assuming count of vertices as the total size / stride
+            mesh->numVerticesSpans++;
         }
 
         // Populate the vertex buffer metadata from accessors.
@@ -506,14 +510,14 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
 {
     for (uint32_t i = 0; i < model->nMeshes; ++i)
     {
-        Mesh m = model->meshes[i];
+        Mesh *m = &model->meshes[i];
 
         // Create committed D3D resources of proper sizes
-        D3D12_RESOURCE_DESC indexDesc = CD3DX12_RESOURCE_DESC_BUFFER(m.Indices.count, D3D12_RESOURCE_FLAG_NONE, 0);
-        D3D12_RESOURCE_DESC meshletDesc = CD3DX12_RESOURCE_DESC_BUFFER(m.Meshlets.count * sizeof(m.Meshlets.data[0]), D3D12_RESOURCE_FLAG_NONE, 0);
-        D3D12_RESOURCE_DESC cullDataDesc = CD3DX12_RESOURCE_DESC_BUFFER(m.CullingData.count * sizeof(m.CullingData.data[0]), D3D12_RESOURCE_FLAG_NONE, 0);
-        D3D12_RESOURCE_DESC vertexIndexDesc = CD3DX12_RESOURCE_DESC_BUFFER(DivRoundUp_int(m.UniqueVertexIndices.count, 4) * 4, D3D12_RESOURCE_FLAG_NONE, 0);
-        D3D12_RESOURCE_DESC primitiveDesc = CD3DX12_RESOURCE_DESC_BUFFER(m.PrimitiveIndices.count * sizeof(m.PrimitiveIndices.data[0]), D3D12_RESOURCE_FLAG_NONE, 0);
+        D3D12_RESOURCE_DESC indexDesc = CD3DX12_RESOURCE_DESC_BUFFER(m->Indices.count, D3D12_RESOURCE_FLAG_NONE, 0);
+        D3D12_RESOURCE_DESC meshletDesc = CD3DX12_RESOURCE_DESC_BUFFER(m->Meshlets.count * sizeof(m->Meshlets.data[0]), D3D12_RESOURCE_FLAG_NONE, 0);
+        D3D12_RESOURCE_DESC cullDataDesc = CD3DX12_RESOURCE_DESC_BUFFER(m->CullingData.count * sizeof(m->CullingData.data[0]), D3D12_RESOURCE_FLAG_NONE, 0);
+        D3D12_RESOURCE_DESC vertexIndexDesc = CD3DX12_RESOURCE_DESC_BUFFER(DivRoundUp_int(m->UniqueVertexIndices.count, 4) * 4, D3D12_RESOURCE_FLAG_NONE, 0);
+        D3D12_RESOURCE_DESC primitiveDesc = CD3DX12_RESOURCE_DESC_BUFFER(m->PrimitiveIndices.count * sizeof(m->PrimitiveIndices.data[0]), D3D12_RESOURCE_FLAG_NONE, 0);
         D3D12_RESOURCE_DESC meshInfoDesc = CD3DX12_RESOURCE_DESC_BUFFER(sizeof(MeshInfo), D3D12_RESOURCE_FLAG_NONE, 0);
     
         D3D12_HEAP_PROPERTIES defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -524,8 +528,8 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &indexDesc,
             D3D12_RESOURCE_STATE_COPY_DEST, 
             NULL, 
-            IID(&m.IndexResource), 
-            (void**) & m.IndexResource);
+            &IID_ID3D12Resource,
+            (void**) & m->IndexResource);
         if (FAILED(hr)) LogErrAndExit(hr);
 
         hr = ID3D12Device_CreateCommittedResource(device, 
@@ -534,8 +538,8 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &meshletDesc, 
             D3D12_RESOURCE_STATE_COPY_DEST, 
             NULL, 
-            IID(&m.MeshletResource), 
-            (void**) & m.MeshInfoResource);
+            &IID_ID3D12Resource,
+            (void**) & m->MeshletResource);
         if (FAILED(hr)) LogErrAndExit(hr);
 
         hr = ID3D12Device_CreateCommittedResource(device, 
@@ -544,8 +548,8 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &cullDataDesc, 
             D3D12_RESOURCE_STATE_COPY_DEST, 
             NULL, 
-            IID(&m.CullDataResource),
-            (void**)&m.CullDataResource);
+            &IID_ID3D12Resource,
+            (void**)&m->CullDataResource);
         if (FAILED(hr)) LogErrAndExit(hr);
 
         hr = ID3D12Device_CreateCommittedResource(device,
@@ -554,8 +558,8 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &vertexIndexDesc, 
             D3D12_RESOURCE_STATE_COPY_DEST, 
             NULL, 
-            IID(&m.UniqueVertexIndexResource),
-            (void**)&m.UniqueVertexIndexResource);
+            &IID_ID3D12Resource,
+            (void**)&m->UniqueVertexIndexResource);
         if (FAILED(hr)) LogErrAndExit(hr);
 
         hr = ID3D12Device_CreateCommittedResource(device, 
@@ -564,8 +568,8 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &primitiveDesc, 
             D3D12_RESOURCE_STATE_COPY_DEST, 
             NULL, 
-            IID(&m.PrimitiveIndexResource),
-            (void**)&m.PrimitiveIndexResource);
+            &IID_ID3D12Resource,
+            (void**)&m->PrimitiveIndexResource);
         if (FAILED(hr)) LogErrAndExit(hr);
 
         hr = ID3D12Device_CreateCommittedResource(device,
@@ -574,29 +578,28 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &meshInfoDesc, 
             D3D12_RESOURCE_STATE_COPY_DEST, 
             NULL, 
-            IID(&m.MeshInfoResource),
-            (void**)&m.MeshInfoResource);
+            &IID_ID3D12Resource,
+            (void**)&m->MeshInfoResource);
         if (FAILED(hr)) LogErrAndExit(hr);
 
-        m.IBView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(m.IndexResource);
-        m.IBView.Format = m.IndexSize == 4 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
-        m.IBView.SizeInBytes = m.IndexCount * m.IndexSize;
+        m->IBView.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(m->IndexResource);
+        m->IBView.Format = m->IndexSize == 4 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
+        m->IBView.SizeInBytes = m->IndexCount * m->IndexSize;
 
-        for (uint32_t j = 0; j < Attribute_Count; ++j)
+        for (uint32_t j = 0; j < m->numVerticesSpans; ++j)
         {
-            D3D12_RESOURCE_DESC vertexDesc = CD3DX12_RESOURCE_DESC_BUFFER(m.VerticesSpans[j].count, D3D12_RESOURCE_FLAG_NONE, 0);
+            D3D12_RESOURCE_DESC vertexDesc = CD3DX12_RESOURCE_DESC_BUFFER(m->VerticesSpans[j].count, D3D12_RESOURCE_FLAG_NONE, 0);
             ID3D12Device_CreateCommittedResource(device,
                 &defaultHeap, 
                 D3D12_HEAP_FLAG_NONE, 
                 &vertexDesc, 
                 D3D12_RESOURCE_STATE_COPY_DEST, 
                 NULL, 
-                IID(&m.VertexResources[j]),
-                (void**)&m.VertexResources[j]);
-
-            m.VBViews[j].BufferLocation = ID3D12Resource_GetGPUVirtualAddress(m.VertexResources[j]);
-            m.VBViews[j].SizeInBytes = (uint32_t)(m.VerticesSpans[j].count);
-            m.VBViews[j].StrideInBytes = m.VertexStrides[j];
+                &IID_ID3D12Resource,
+                (void**)&m->VertexResources[j]);
+            m->VBViews[j].BufferLocation = ID3D12Resource_GetGPUVirtualAddress(m->VertexResources[j]);
+            m->VBViews[j].SizeInBytes = (uint32_t)(m->VerticesSpans[j].count);
+            m->VBViews[j].StrideInBytes = m->VertexStrides[j];
         }
 
         // Create upload resources
@@ -615,7 +618,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &indexDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
-            IID(&indexUpload),
+            &IID_ID3D12Resource,
             (void**)&indexUpload);
         if (FAILED(hr)) LogErrAndExit(hr);
 
@@ -625,7 +628,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &meshletDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
-            IID(&meshletUpload),
+            &IID_ID3D12Resource,
             (void**)&meshletUpload);
         if (FAILED(hr)) LogErrAndExit(hr);
 
@@ -635,7 +638,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &cullDataDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
-            IID(&cullDataUpload),
+            &IID_ID3D12Resource,
             (void**)&cullDataUpload);
         if (FAILED(hr)) LogErrAndExit(hr);
 
@@ -645,7 +648,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &vertexIndexDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
-            IID(&uniqueVertexIndexUpload),
+            &IID_ID3D12Resource,
             (void**)&uniqueVertexIndexUpload);
         if (FAILED(hr)) LogErrAndExit(hr);
 
@@ -655,7 +658,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &primitiveDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
-            IID(&primitiveIndexUpload),
+            &IID_ID3D12Resource,
             (void**)&primitiveIndexUpload);
         if (FAILED(hr)) LogErrAndExit(hr);
 
@@ -665,70 +668,70 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &meshInfoDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             NULL,
-            IID(&meshInfoUpload),
+            &IID_ID3D12Resource,
             (void**)&meshInfoUpload);
         if (FAILED(hr)) LogErrAndExit(hr);
 
-        for (uint32_t j = 0; j < Attribute_Count; ++j)
+        for (uint32_t j = 0; j < m->numVerticesSpans; ++j)
         {
-            D3D12_RESOURCE_DESC vertexDesc = CD3DX12_RESOURCE_DESC_BUFFER(m.VerticesSpans[j].count, D3D12_RESOURCE_FLAG_NONE, 0);
+            D3D12_RESOURCE_DESC vertexDesc = CD3DX12_RESOURCE_DESC_BUFFER(m->VerticesSpans[j].count, D3D12_RESOURCE_FLAG_NONE, 0);
             hr = ID3D12Device_CreateCommittedResource(device,
                 &uploadHeap,
                 D3D12_HEAP_FLAG_NONE,
                 &vertexDesc,
                 D3D12_RESOURCE_STATE_GENERIC_READ,
                 NULL,
-                IID(&vertexUploads[j]),
+                &IID_ID3D12Resource,
                 (void**)&vertexUploads[j]);
             if (FAILED(hr)) LogErrAndExit(hr);
 
             uint8_t* memory = NULL;
             ID3D12Resource_Map(vertexUploads[j], 0, NULL, (void**)&memory);
-            memcpy(memory, m.VerticesSpans[j].data, m.VerticesSpans[j].count);
+            memcpy(memory, m->VerticesSpans[j].data, m->VerticesSpans[j].count);
             ID3D12Resource_Unmap(vertexUploads[j], 0, NULL);
         }
 
         {
             uint8_t* memory = NULL;
             ID3D12Resource_Map(indexUpload, 0, NULL, (void**)(&memory));
-            memcpy(memory, m.Indices.data, m.Indices.count);
+            memcpy(memory, m->Indices.data, m->Indices.count);
             ID3D12Resource_Unmap(indexUpload, 0, NULL);
         }
 
         {
             uint8_t* memory = NULL;
             ID3D12Resource_Map(meshletUpload, 0, NULL, (void**)(&memory));
-            memcpy(memory, m.Meshlets.data, m.Meshlets.count * sizeof(m.Meshlets.data[0]));
+            memcpy(memory, m->Meshlets.data, m->Meshlets.count * sizeof(m->Meshlets.data[0]));
             ID3D12Resource_Unmap(meshletUpload, 0, NULL);
         }
 
         {
             uint8_t* memory = NULL;
             ID3D12Resource_Map(cullDataUpload, 0, NULL, (void**)(&memory));
-            memcpy(memory, m.CullingData.data, m.CullingData.count * sizeof(m.CullingData.data[0]));
+            memcpy(memory, m->CullingData.data, m->CullingData.count * sizeof(m->CullingData.data[0]));
             ID3D12Resource_Unmap(cullDataUpload, 0, NULL);
         }
 
         {
             uint8_t* memory = NULL;
             ID3D12Resource_Map(uniqueVertexIndexUpload, 0, NULL, (void**)(&memory));
-            memcpy(memory, m.UniqueVertexIndices.data, m.UniqueVertexIndices.count);
+            memcpy(memory, m->UniqueVertexIndices.data, m->UniqueVertexIndices.count);
             ID3D12Resource_Unmap(uniqueVertexIndexUpload, 0, NULL);
         }
 
         {
             uint8_t* memory = NULL;
             ID3D12Resource_Map(primitiveIndexUpload, 0, NULL, (void**)(&memory));
-            memcpy(memory, m.PrimitiveIndices.data, m.PrimitiveIndices.count * sizeof(m.PrimitiveIndices.data[0]));
+            memcpy(memory, m->PrimitiveIndices.data, m->PrimitiveIndices.count * sizeof(m->PrimitiveIndices.data[0]));
             ID3D12Resource_Unmap(primitiveIndexUpload, 0, NULL);
         }
 
         {
             MeshInfo info = {0};
-            info.IndexSize = m.IndexSize;
-            info.MeshletCount = (uint32_t)(m.Meshlets.count);
-            info.LastMeshletVertCount = SPAN_BACK(m.Meshlets).VertCount;
-            info.LastMeshletPrimCount = SPAN_BACK(m.Meshlets).PrimCount;
+            info.IndexSize = m->IndexSize;
+            info.MeshletCount = (uint32_t)(m->Meshlets.count);
+            info.LastMeshletVertCount = SPAN_BACK(m->Meshlets).VertCount;
+            info.LastMeshletPrimCount = SPAN_BACK(m->Meshlets).PrimCount;
 
 
             uint8_t* memory = NULL;
@@ -740,10 +743,10 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
         // Populate our command list
         ID3D12GraphicsCommandList_Reset(cmdList, cmdAlloc, NULL);
 
-        for (uint32_t j = 0; j < Attribute_Count; ++j)
+        for (uint32_t j = 0; j < m->numVerticesSpans; ++j)
         {
-            ID3D12GraphicsCommandList_CopyResource(cmdList, m.VertexResources[j], vertexUploads[j]);
-            D3D12_RESOURCE_BARRIER barrier = CD3DX12_Transition(m.VertexResources[j], 
+            ID3D12GraphicsCommandList_CopyResource(cmdList, m->VertexResources[j], vertexUploads[j]);
+            D3D12_RESOURCE_BARRIER barrier = CD3DX12_Transition(m->VertexResources[j], 
                 D3D12_RESOURCE_STATE_COPY_DEST, 
                 D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
                 D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
@@ -753,43 +756,43 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
 
         D3D12_RESOURCE_BARRIER postCopyBarriers[6];
 
-        ID3D12GraphicsCommandList_CopyResource(cmdList, m.IndexResource, indexUpload);
-        postCopyBarriers[0] = CD3DX12_Transition(m.IndexResource, 
+        ID3D12GraphicsCommandList_CopyResource(cmdList, m->IndexResource, indexUpload);
+        postCopyBarriers[0] = CD3DX12_Transition(m->IndexResource, 
             D3D12_RESOURCE_STATE_COPY_DEST, 
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
             D3D12_RESOURCE_BARRIER_FLAG_NONE);
 
-        ID3D12GraphicsCommandList_CopyResource(cmdList, m.MeshletResource, meshletUpload);
-        postCopyBarriers[1] = CD3DX12_Transition(m.MeshletResource,
+        ID3D12GraphicsCommandList_CopyResource(cmdList, m->MeshletResource, meshletUpload);
+        postCopyBarriers[1] = CD3DX12_Transition(m->MeshletResource,
             D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
             D3D12_RESOURCE_BARRIER_FLAG_NONE);
 
-        ID3D12GraphicsCommandList_CopyResource(cmdList, m.CullDataResource, cullDataUpload);
-        postCopyBarriers[2] = CD3DX12_Transition(m.CullDataResource,
+        ID3D12GraphicsCommandList_CopyResource(cmdList, m->CullDataResource, cullDataUpload);
+        postCopyBarriers[2] = CD3DX12_Transition(m->CullDataResource,
             D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
             D3D12_RESOURCE_BARRIER_FLAG_NONE);
 
-        ID3D12GraphicsCommandList_CopyResource(cmdList, m.UniqueVertexIndexResource, uniqueVertexIndexUpload);
-        postCopyBarriers[3] = CD3DX12_Transition(m.UniqueVertexIndexResource,
+        ID3D12GraphicsCommandList_CopyResource(cmdList, m->UniqueVertexIndexResource, uniqueVertexIndexUpload);
+        postCopyBarriers[3] = CD3DX12_Transition(m->UniqueVertexIndexResource,
             D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
             D3D12_RESOURCE_BARRIER_FLAG_NONE);
 
-        ID3D12GraphicsCommandList_CopyResource(cmdList, m.PrimitiveIndexResource, primitiveIndexUpload);
-        postCopyBarriers[4] = CD3DX12_Transition(m.PrimitiveIndexResource,
+        ID3D12GraphicsCommandList_CopyResource(cmdList, m->PrimitiveIndexResource, primitiveIndexUpload);
+        postCopyBarriers[4] = CD3DX12_Transition(m->PrimitiveIndexResource,
             D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
             D3D12_RESOURCE_BARRIER_FLAG_NONE);
 
-        ID3D12GraphicsCommandList_CopyResource(cmdList, m.MeshInfoResource, meshInfoUpload);
-        postCopyBarriers[5] = CD3DX12_Transition(m.MeshInfoResource,
+        ID3D12GraphicsCommandList_CopyResource(cmdList, m->MeshInfoResource, meshInfoUpload);
+        postCopyBarriers[5] = CD3DX12_Transition(m->MeshInfoResource,
             D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
@@ -825,7 +828,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             CloseHandle(event);
         }
     }
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 uint32_t GetFormatSize(DXGI_FORMAT format)

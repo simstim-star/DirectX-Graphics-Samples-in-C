@@ -1,11 +1,12 @@
 #pragma once
-#include "DirectXMathC.h"
+
+/*
+* This will be used by both the shaders and the regular code, so we need to add flags for DXC
+* not receive invalid HLSL code.
+*/
 
 #define MAX(x, y) (x > y ? x : y)
 #define ROUNDUP(x, y) ((x + y - 1) & ~(y - 1))
-
-// In C, Alignas is applied to objects only, not to types
-#define ALIGNED_CONSTANTS _Alignas(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT) Constants
 
 #define MAX_VERTS 64
 #define MAX_PRIMS 126
@@ -17,29 +18,44 @@
 #define AS_GROUP_SIZE THREADS_PER_WAVE
 #define MS_GROUP_SIZE ROUNDUP(MAX(MAX_VERTS, MAX_PRIMS), THREADS_PER_WAVE)
 
+#ifndef __HLSL__
+#include <DirectXMathC.h>
+typedef XMFLOAT4X4 float4x4;
+typedef XMFLOAT4 float4;
+typedef XMFLOAT3 float3;
+typedef XMFLOAT2 float2;
+typedef uint32_t uint;
+#endif
 
-typedef struct Constants
+
+#ifndef __HLSL__ 
+#define CBUFFER_ALIGN __declspec(align(256))
+#else
+#define CBUFFER_ALIGN 
+#endif
+
+struct CBUFFER_ALIGN Constants
 {
-    XMFLOAT4X4 View;
-    XMFLOAT4X4 ViewProj;
+    float4x4 View;
+    float4x4 ViewProj;
 
-    XMFLOAT4 Planes[6];
-    XMFLOAT3 ViewPosition;
+    float4 Planes[6];
+    float3 ViewPosition;
     float RecipTanHalfFovy;
 
-    uint32_t RenderMode;
-    uint32_t LODCount;
-} Constants;
+    uint RenderMode;
+    uint LODCount;
+};
 
-typedef struct DrawParams
+struct DrawParams
 {
-    uint32_t InstanceOffset;
-    uint32_t InstanceCount;
-} DrawParams;
+    uint InstanceOffset;
+    uint InstanceCount;
+};
 
-typedef struct Instance
+struct Instance
 {
-    XMFLOAT4X4 World;
-    XMFLOAT4X4 WorldInvTranspose;
-    XMFLOAT4   BoundingSphere;
-} Instance;
+    float4x4 World;
+    float4x4 WorldInvTranspose;
+    float4   BoundingSphere;
+};

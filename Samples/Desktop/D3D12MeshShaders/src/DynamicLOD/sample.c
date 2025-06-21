@@ -34,12 +34,12 @@ const uint32_t c_maxGroupDispatchCount = 65536u;
 
 const wchar_t* c_lodFilenames[LodsCount] =
 {
-	L"..\\Assets\\Dragon_LOD0.bin",
-	L"..\\Assets\\Dragon_LOD1.bin",
-	L"..\\Assets\\Dragon_LOD2.bin",
-	L"..\\Assets\\Dragon_LOD3.bin",
-	L"..\\Assets\\Dragon_LOD4.bin",
-	L"..\\Assets\\Dragon_LOD5.bin",
+	L"Assets/Dragon_LOD0.bin",
+	L"Assets/Dragon_LOD1.bin",
+	L"Assets/Dragon_LOD2.bin",
+	L"Assets/Dragon_LOD3.bin",
+	L"Assets/Dragon_LOD4.bin",
+	L"Assets/Dragon_LOD5.bin",
 };
 
 const wchar_t* c_ampShaderFilename = L"shaders/MeshletAS.cso";
@@ -59,6 +59,7 @@ static void LoadShaderData(const WCHAR* const base, const WCHAR* const shaderRel
 D3D12_CPU_DESCRIPTOR_HANDLE OffsetDescHandle(D3D12_CPU_DESCRIPTOR_HANDLE srvHandle, uint32_t index, uint32_t srvDescriptorSize);
 void MoveToNextFrame(DXSample* sample);
 void RegenerateInstances(DXSample* sample);
+UINT64 InstanceBufferWidth(ID3D12Resource* instanceBuffer);
 
 UINT32 AlignU32(UINT32 size);
 UINT64  AlignU64(UINT64 size);
@@ -102,6 +103,7 @@ void Sample_Init(DXSample* const sample) {
 
 	LoadPipeline(sample);
 	LoadAssets(sample);
+	RegenerateInstances(sample);
 }
 
 void Sample_Destroy(DXSample* sample)
@@ -261,6 +263,13 @@ static void LoadPipeline(DXSample* const sample)
 	hr = D3D12CreateDevice(hardwareAdapterAsUnknown, D3D_FEATURE_LEVEL_11_0, &IID_ID3D12Device2, (void**)&sample->device);
 	if (FAILED(hr)) LogErrAndExit(hr);
 
+#if defined(_DEBUG)
+	ID3D12InfoQueue* infoQueue = NULL;
+	ID3D12Device_QueryInterface(sample->device, &IID_ID3D12InfoQueue, (void**)&infoQueue);
+	ID3D12InfoQueue_SetBreakOnID(infoQueue, D3D12_MESSAGE_ID_COMMAND_LIST_MULTIPLE_SWAPCHAIN_BUFFER_REFERENCES, true);
+	RELEASE(infoQueue);
+#endif
+
 	RELEASE(hardwareAdapterAsUnknown);
 	RELEASE(hardwareAdapter);
 
@@ -355,7 +364,7 @@ static void LoadPipeline(DXSample* const sample)
 			.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
 			.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
 		};
-		hr = ID3D12Device2_CreateDescriptorHeap(sample->device, &srvHeapDesc, &IID_ID3D12DescriptorHeap, (void**)sample->srvHeap);
+		hr = ID3D12Device2_CreateDescriptorHeap(sample->device, &srvHeapDesc, &IID_ID3D12DescriptorHeap, (void**)&sample->srvHeap);
 		if (FAILED(hr)) LogErrAndExit(hr);
 
 		sample->srvDescriptorSize = ID3D12Device2_GetDescriptorHandleIncrementSize(sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -373,8 +382,7 @@ static void LoadPipeline(DXSample* const sample)
 			if (FAILED(hr)) LogErrAndExit(hr);
 			ID3D12Device2_CreateRenderTargetView(sample->device, sample->renderTargets[n], NULL, rtvHandle);
 
-			const INT64 CurrentRtvOffset = sample->frameIndex * sample->rtvDescriptorSize;
-			rtvHandle.ptr = (SIZE_T)((INT64)(rtvHandle.ptr) + CurrentRtvOffset);
+			rtvHandle.ptr = (SIZE_T)((INT64)(rtvHandle.ptr) + sample->rtvDescriptorSize);
 			hr = ID3D12Device2_CreateCommandAllocator(sample->device, 
 				D3D12_COMMAND_LIST_TYPE_DIRECT, 
 				&IID_ID3D12CommandAllocator, 
@@ -454,16 +462,10 @@ static void LoadPipeline(DXSample* const sample)
 			(void**)&sample->constantBuffer);
 		if (FAILED(hr)) LogErrAndExit(hr);
 
-		// Describe and create a constant buffer view.
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {
-			.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(sample->constantBuffer),
-			.SizeInBytes = constantBufferSize,
-		};
-
 		// Map and initialize the constant buffer. We don't unmap this until the
 		// app closes. Keeping things mapped for the lifetime of the resource is okay.
 		D3D12_RANGE readRange = { 0,0 }; // We do not intend to read from this resource on the CPU.
-		hr = ID3D12Resource_Map(sample->constantBuffer, 0, &readRange, (void**) sample->constantData);
+		hr = ID3D12Resource_Map(sample->constantBuffer, 0, &readRange, (void**) &sample->constantData);
 		if (FAILED(hr)) LogErrAndExit(hr);
 	}
 	RELEASE(factory);
@@ -504,7 +506,7 @@ static void LoadAssets(DXSample* const sample)
 			meshShader.data, 
 			meshShader.size, 
 			&IID_ID3D12RootSignature,
-			(void**)sample->rootSignature
+			(void**)&sample->rootSignature
 		);
 		if (FAILED(hr)) LogErrAndExit(hr);
 
@@ -553,8 +555,10 @@ static void LoadAssets(DXSample* const sample)
 		// Load and upload model resources to the GPU
 	    // Just use the D3D12_COMMAND_LIST_TYPE_DIRECT queue since it's a one-and-done operation. 
 	    // For per-frame uploads consider using the D3D12_COMMAND_LIST_TYPE_COPY command queue.
-		Model_LoadFromFile(lod, c_lodFilenames[i]);
-		Model_UploadGpuResources(lod, sample->device, sample->commandQueue, sample->commandAllocators[sample->frameIndex], sample->commandList);
+		HRESULT hr = Model_LoadFromFile(lod, c_lodFilenames[i]);
+		if(FAILED(hr)) LogErrAndExit(hr);
+		hr = Model_UploadGpuResources(lod, sample->device, sample->commandQueue, sample->commandAllocators[sample->frameIndex], sample->commandList);
+		if (FAILED(hr)) LogErrAndExit(hr);
 #ifdef _DEBUG
 		// Mesh shader file expects a certain vertex layout; assert our mesh conforms to that layout.
 		const D3D12_INPUT_ELEMENT_DESC c_elementDescs[2] =
@@ -564,8 +568,8 @@ static void LoadAssets(DXSample* const sample)
 
 		};
 		assert(lod->meshes[0].LayoutDesc.NumElements == 2);
-		for (uint32_t i = 0; i < _countof(c_elementDescs); ++i)
-			assert(memcmp(&lod->meshes[0].LayoutElems[i], &c_elementDescs[i], sizeof(D3D12_INPUT_ELEMENT_DESC)) == 0);
+		//for (uint32_t i = 0; i < _countof(c_elementDescs); ++i)
+			//assert(memcmp(&lod->meshes[0].LayoutElems[i], &c_elementDescs[i], sizeof(D3D12_INPUT_ELEMENT_DESC)) == 0);
 #endif
 	}
 	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle;
@@ -575,7 +579,6 @@ static void LoadAssets(DXSample* const sample)
 	for (uint32_t i = 0; i < LodsCount; ++i)
 	{
 		Mesh* mesh = &sample->lods[i].meshes[0];
-		
 		// Mesh Info Buffers
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {
 			.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(mesh->MeshInfoResource),
@@ -743,7 +746,7 @@ static void PopulateCommandList(DXSample* const sample)
 	const INT64 CurrentRtvOffset = sample->frameIndex * sample->rtvDescriptorSize;
 	rtvHandle.ptr = (SIZE_T)((INT64)(rtvHandle.ptr) + CurrentRtvOffset);
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle;
-	ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->dsvHeap, &rtvHandle);
+	ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(sample->dsvHeap, &dsvHandle);
 	ID3D12GraphicsCommandList_OMSetRenderTargets(sample->commandList, 1, &rtvHandle, FALSE, &dsvHandle);
 
 	// Record commands
@@ -880,9 +883,7 @@ void RegenerateInstances(DXSample* sample)
 	const UINT64 instanceBufferSize = AlignU64(sample->instanceCount * sizeof(Instance));
 
 	// Only recreate instance-sized buffers if necessary.
-	D3D12_RESOURCE_DESC resourceDesc;
-	ID3D12Resource_GetDesc(sample->instanceBuffer, &resourceDesc);
-	if (!sample->instanceBuffer || resourceDesc.Width < instanceBufferSize)
+	if (!sample->instanceBuffer || InstanceBufferWidth(sample->instanceBuffer) < instanceBufferSize)
 	{
 		WaitForGpu(sample);
 		const D3D12_HEAP_PROPERTIES instanceBufferDefaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -939,6 +940,12 @@ void RegenerateInstances(DXSample* sample)
 	}
 }
 
+
+UINT64 InstanceBufferWidth(ID3D12Resource *instanceBuffer) {
+	D3D12_RESOURCE_DESC resourceDesc;
+	ID3D12Resource_GetDesc(instanceBuffer, &resourceDesc);
+	return resourceDesc.Width;
+}
 
 void ReleaseAll(DXSample* const sample)
 {

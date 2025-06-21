@@ -6,7 +6,9 @@ Also check my [DirectX-Graphics-Samples-in-C](https://github.com/simstim-star/Di
 This was done for educational purposes, in order to learn better about COM and DirectX.
 
 ## How to build (MSVC)
-First, you will need to get [DirectXMath-in-C](https://github.com/simstim-star/DirectXMath-in-C) and install it with:
+Requirements: DirectX 12.2 ("DirectX 12 Ultimate"), DirectX Shader Compiler (DXC) and DirectXMathC
+
+Get [DirectXMath-in-C](https://github.com/simstim-star/DirectXMath-in-C) and install it with:
 
 ```
 cmake -S . -B build-install
@@ -23,4 +25,3 @@ cmake --build build
 ```
 
 This will already link `xmathc`.
-```
