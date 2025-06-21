@@ -231,10 +231,11 @@ static void LoadPipeline(DXSample* const sample)
 
 #if defined(_DEBUG)
 	// Enable the debug layer (requires the Graphics Tools "optional feature").
-	ID3D12Debug* debugController = NULL;
+	ID3D12Debug1* debugController = NULL;
 	if (SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug,(void**) &debugController)))
 	{
 		ID3D12Debug_EnableDebugLayer(debugController);
+		ID3D12Debug1_SetEnableGPUBasedValidation(debugController, TRUE);
 		isDebugFactory |= DXGI_CREATE_FACTORY_DEBUG;
 		RELEASE(debugController);
 	}
@@ -266,7 +267,7 @@ static void LoadPipeline(DXSample* const sample)
 #if defined(_DEBUG)
 	ID3D12InfoQueue* infoQueue = NULL;
 	ID3D12Device_QueryInterface(sample->device, &IID_ID3D12InfoQueue, (void**)&infoQueue);
-	ID3D12InfoQueue_SetBreakOnID(infoQueue, D3D12_MESSAGE_ID_COMMAND_LIST_MULTIPLE_SWAPCHAIN_BUFFER_REFERENCES, true);
+	ID3D12InfoQueue_SetBreakOnSeverity(infoQueue, D3D12_MESSAGE_SEVERITY_ERROR, true);
 	RELEASE(infoQueue);
 #endif
 
@@ -753,7 +754,6 @@ static void PopulateCommandList(DXSample* const sample)
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	ID3D12GraphicsCommandList_ClearRenderTargetView(sample->commandList, rtvHandle, clearColor, 0, NULL);
 	ID3D12GraphicsCommandList_ClearDepthStencilView(sample->commandList, dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
-	ID3D12Resource_GetGPUVirtualAddress(sample->constantBuffer);
 	ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(
 		sample->commandList, 
 		0, 
@@ -836,9 +836,7 @@ static void WaitForGpu(DXSample *sample)
 	// Wait until the fence has been processed.
 	hr = ID3D12Fence_SetEventOnCompletion(sample->fence, sample->fenceValues[sample->frameIndex], sample->fenceEvent);
 	if (FAILED(hr)) LogErrAndExit(hr);
-
 	WaitForSingleObjectEx(sample->fenceEvent, INFINITE, FALSE);
-
 	// Increment the fence value for the current frame.
 	sample->fenceValues[sample->frameIndex]++;
 }

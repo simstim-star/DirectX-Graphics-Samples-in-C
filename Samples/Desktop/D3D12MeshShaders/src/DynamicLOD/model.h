@@ -35,7 +35,7 @@ typedef struct Meshlet
     uint32_t PrimOffset;
 } Meshlet;
 
-typedef struct MeshInfo
+typedef struct __declspec(align(256)) MeshInfo
 {
     uint32_t IndexSize;
     uint32_t MeshletCount;
