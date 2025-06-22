@@ -244,6 +244,6 @@ typedef struct Model {
  * for the model data and reads the mesh, accessor, and buffer view information into the model's internal structures.        *
  * The model’s mesh data is parsed, and bounding spheres for each mesh are calculated.                                       *
  *****************************************************************************************************************************/
-HRESULT Model_LoadFromFile(Model* const m, const wchar_t* filename);
+HRESULT Model_LoadFromFile(Model* const m, const wchar_t* const basepath, const wchar_t* const assetpath);
 
 HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12CommandQueue* cmdQueue, ID3D12CommandAllocator* cmdAlloc, ID3D12GraphicsCommandList6* cmdList);

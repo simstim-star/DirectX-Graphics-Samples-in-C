@@ -28,6 +28,12 @@ add_custom_command(
     COMMENT "Copying shaders" VERBATIM
 )
 
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    COMMENT "Copying Assets" VERBATIM
+)
+
 target_compile_options(${PROJECT_NAME} PRIVATE /WX)
 
 # not good to hardcode the path as below... it should be automatic once installed
@@ -35,13 +41,6 @@ find_package(XMathC REQUIRED PATHS "C:/xmathc")
 
 target_link_libraries(${PROJECT_NAME} PUBLIC d3d12.lib dxguid.lib dxgi.lib D3DCompiler.lib XMathC) 
 
-add_custom_command(
-    TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_CURRENT_SOURCE_DIR}/Assets
-            $<TARGET_FILE_DIR:${PROJECT_NAME}>/Assets
-    COMMENT "Copying Assets" VERBATIM
-)
 # Build HLSL shaders
 add_custom_target(shaders)
 

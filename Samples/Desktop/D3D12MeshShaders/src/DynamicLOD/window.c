@@ -59,7 +59,6 @@ int Win32App_Run(DXSample* const pSample, const HINSTANCE hInstance, const int n
     }
 
     Sample_Destroy(pSample);
-
     // Return this part of the WM_QUIT message to Windows.
     return (char)(msg.wParam);
 }

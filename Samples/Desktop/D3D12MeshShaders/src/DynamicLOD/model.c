@@ -188,16 +188,16 @@ typedef struct MeshHeader
     uint32_t CullDataIndex;
 } MeshHeader;
 
-HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const filename)
+HRESULT Model_LoadFromFile(Model *const m, const wchar_t* const basepath, const wchar_t* const assetpath)
 {
-    wchar_t cwd[MAX_PATH];
-    GetCurrentDirectoryW(MAX_PATH, cwd);
-    wprintf(L"Working directory: %ls\n", cwd);
-
-    FILE* file = _wfopen(filename, L"rb");
+    size_t bufferSize = wcslen(basepath) + wcslen(assetpath) + 1;
+    WCHAR* filePath = HeapAlloc(GetProcessHeap(), 0, bufferSize * sizeof(WCHAR));
+    swprintf(filePath, bufferSize, L"%s%s", basepath, assetpath);
+    FILE* file = _wfopen(filePath, L"rb");
     if (!file) {
         return E_INVALIDARG;
     }
+    HeapFree(GetProcessHeap(), 0, filePath);
 
     // Read header
     FileHeader header;
@@ -526,7 +526,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &defaultHeap, 
             D3D12_HEAP_FLAG_NONE, 
             &indexDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, 
             &IID_ID3D12Resource,
             (void**) & m->IndexResource);
@@ -536,7 +536,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &defaultHeap, 
             D3D12_HEAP_FLAG_NONE, 
             &meshletDesc, 
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, 
             &IID_ID3D12Resource,
             (void**) & m->MeshletResource);
@@ -546,7 +546,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &defaultHeap, 
             D3D12_HEAP_FLAG_NONE, 
             &cullDataDesc, 
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, 
             &IID_ID3D12Resource,
             (void**)&m->CullDataResource);
@@ -556,7 +556,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &defaultHeap,
             D3D12_HEAP_FLAG_NONE, 
             &vertexIndexDesc, 
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, 
             &IID_ID3D12Resource,
             (void**)&m->UniqueVertexIndexResource);
@@ -566,7 +566,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &defaultHeap, 
             D3D12_HEAP_FLAG_NONE, 
             &primitiveDesc, 
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, 
             &IID_ID3D12Resource,
             (void**)&m->PrimitiveIndexResource);
@@ -576,7 +576,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
             &defaultHeap, 
             D3D12_HEAP_FLAG_NONE, 
             &meshInfoDesc, 
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COMMON,
             NULL, 
             &IID_ID3D12Resource,
             (void**)&m->MeshInfoResource);
@@ -593,7 +593,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
                 &defaultHeap, 
                 D3D12_HEAP_FLAG_NONE, 
                 &vertexDesc, 
-                D3D12_RESOURCE_STATE_COPY_DEST, 
+                D3D12_RESOURCE_STATE_COMMON,
                 NULL, 
                 &IID_ID3D12Resource,
                 (void**)&m->VertexResources[j]);
@@ -747,7 +747,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
         {
             ID3D12GraphicsCommandList_CopyResource(cmdList, m->VertexResources[j], vertexUploads[j]);
             D3D12_RESOURCE_BARRIER barrier = CD3DX12_Transition(m->VertexResources[j], 
-                D3D12_RESOURCE_STATE_COPY_DEST, 
+                D3D12_RESOURCE_STATE_COPY_DEST,
                 D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
                 D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
                 D3D12_RESOURCE_BARRIER_FLAG_NONE);
@@ -758,7 +758,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
 
         ID3D12GraphicsCommandList_CopyResource(cmdList, m->IndexResource, indexUpload);
         postCopyBarriers[0] = CD3DX12_Transition(m->IndexResource, 
-            D3D12_RESOURCE_STATE_COPY_DEST, 
+            D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 
             D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
             D3D12_RESOURCE_BARRIER_FLAG_NONE);

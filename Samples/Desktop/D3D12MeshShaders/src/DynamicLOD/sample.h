@@ -40,7 +40,7 @@ typedef struct DXSample
     // Adapter info.
     bool useWarpDevice;
     // Root assets path.
-    WCHAR assetsPath[512];
+    WCHAR currentPath[512];
     // Window title.
     CHAR* title;
 

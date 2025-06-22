@@ -34,12 +34,12 @@ const uint32_t c_maxGroupDispatchCount = 65536u;
 
 const wchar_t* c_lodFilenames[LodsCount] =
 {
-	L"Assets/Dragon_LOD0.bin",
-	L"Assets/Dragon_LOD1.bin",
-	L"Assets/Dragon_LOD2.bin",
-	L"Assets/Dragon_LOD3.bin",
-	L"Assets/Dragon_LOD4.bin",
-	L"Assets/Dragon_LOD5.bin",
+	L"assets/Dragon_LOD0.bin",
+	L"assets/Dragon_LOD1.bin",
+	L"assets/Dragon_LOD2.bin",
+	L"assets/Dragon_LOD3.bin",
+	L"assets/Dragon_LOD4.bin",
+	L"assets/Dragon_LOD5.bin",
 };
 
 const wchar_t* c_ampShaderFilename = L"shaders/MeshletAS.cso";
@@ -84,7 +84,7 @@ void Sample_Init(DXSample* const sample) {
 	sample->rtvDescriptorSize = 0;
 	sample->dsvDescriptorSize = 0;
 	sample->srvDescriptorSize = 0;
-	GetCurrentPath(sample->assetsPath, _countof(sample->assetsPath));
+	GetCurrentPath(sample->currentPath, _countof(sample->currentPath));
 
 	StepTimer_Init(&sample->timer);
 	sample->camera = SimpleCamera_Spawn((XMFLOAT3) { 0, 75, 150 });
@@ -235,7 +235,6 @@ static void LoadPipeline(DXSample* const sample)
 	if (SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug,(void**) &debugController)))
 	{
 		ID3D12Debug_EnableDebugLayer(debugController);
-		ID3D12Debug1_SetEnableGPUBasedValidation(debugController, TRUE);
 		isDebugFactory |= DXGI_CREATE_FACTORY_DEBUG;
 		RELEASE(debugController);
 	}
@@ -457,7 +456,7 @@ static void LoadPipeline(DXSample* const sample)
 			&constantBufferHeapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&constantBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_COMMON,
 			NULL,
 			&IID_ID3D12Resource,
 			(void**)&sample->constantBuffer);
@@ -497,9 +496,9 @@ static void LoadAssets(DXSample* const sample)
 		} ampShader, meshShader, pixelShader;
 
 		/* Load pre-compiled shaders */
-		LoadShaderData(sample->assetsPath, c_ampShaderFilename, &ampShader.data, &ampShader.size);
-		LoadShaderData(sample->assetsPath, c_meshShaderFilename, &meshShader.data, &meshShader.size);
-		LoadShaderData(sample->assetsPath, c_pixelShaderFilename, &pixelShader.data, &pixelShader.size);
+		LoadShaderData(sample->currentPath, c_ampShaderFilename, &ampShader.data, &ampShader.size);
+		LoadShaderData(sample->currentPath, c_meshShaderFilename, &meshShader.data, &meshShader.size);
+		LoadShaderData(sample->currentPath, c_pixelShaderFilename, &pixelShader.data, &pixelShader.size);
 
 		// Pull root signature from the precompiled mesh shader.
 		hr = ID3D12Device2_CreateRootSignature(sample->device, 
@@ -556,7 +555,7 @@ static void LoadAssets(DXSample* const sample)
 		// Load and upload model resources to the GPU
 	    // Just use the D3D12_COMMAND_LIST_TYPE_DIRECT queue since it's a one-and-done operation. 
 	    // For per-frame uploads consider using the D3D12_COMMAND_LIST_TYPE_COPY command queue.
-		HRESULT hr = Model_LoadFromFile(lod, c_lodFilenames[i]);
+		HRESULT hr = Model_LoadFromFile(lod, sample->currentPath, c_lodFilenames[i]);
 		if(FAILED(hr)) LogErrAndExit(hr);
 		hr = Model_UploadGpuResources(lod, sample->device, sample->commandQueue, sample->commandAllocators[sample->frameIndex], sample->commandList);
 		if (FAILED(hr)) LogErrAndExit(hr);
@@ -569,8 +568,18 @@ static void LoadAssets(DXSample* const sample)
 
 		};
 		assert(lod->meshes[0].LayoutDesc.NumElements == 2);
-		//for (uint32_t i = 0; i < _countof(c_elementDescs); ++i)
-			//assert(memcmp(&lod->meshes[0].LayoutElems[i], &c_elementDescs[i], sizeof(D3D12_INPUT_ELEMENT_DESC)) == 0);
+		for (uint32_t i = 0; i < _countof(c_elementDescs); ++i) {
+			const D3D12_INPUT_ELEMENT_DESC* actual = &lod->meshes[0].LayoutElems[i];
+			const D3D12_INPUT_ELEMENT_DESC* expected = &c_elementDescs[i];
+
+			assert(strcmp(actual->SemanticName, expected->SemanticName) == 0);
+			assert(actual->SemanticIndex == expected->SemanticIndex);
+			assert(actual->Format == expected->Format);
+			assert(actual->InputSlot == expected->InputSlot);
+			assert(actual->AlignedByteOffset == expected->AlignedByteOffset);
+			assert(actual->InputSlotClass == expected->InputSlotClass);
+			assert(actual->InstanceDataStepRate == expected->InstanceDataStepRate);
+		}
 #endif
 	}
 	D3D12_CPU_DESCRIPTOR_HANDLE srvHandle;
@@ -892,7 +901,7 @@ void RegenerateInstances(DXSample* sample)
 			&instanceBufferDefaultHeapProps,
 			D3D12_HEAP_FLAG_NONE,
 			&instanceBufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_COMMON,
 			NULL,
 			&IID_ID3D12Resource,
 			(void**)(&sample->instanceBuffer)
