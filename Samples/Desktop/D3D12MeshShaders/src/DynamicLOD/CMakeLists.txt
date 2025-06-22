@@ -30,7 +30,7 @@ add_custom_command(
 
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/lod_assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/lod_assets
     COMMENT "Copying Assets" VERBATIM
 )
 

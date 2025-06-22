@@ -34,12 +34,12 @@ const uint32_t c_maxGroupDispatchCount = 65536u;
 
 const wchar_t* c_lodFilenames[LodsCount] =
 {
-	L"assets/Dragon_LOD0.bin",
-	L"assets/Dragon_LOD1.bin",
-	L"assets/Dragon_LOD2.bin",
-	L"assets/Dragon_LOD3.bin",
-	L"assets/Dragon_LOD4.bin",
-	L"assets/Dragon_LOD5.bin",
+	L"lod_assets/Dragon_LOD0.bin",
+	L"lod_assets/Dragon_LOD1.bin",
+	L"lod_assets/Dragon_LOD2.bin",
+	L"lod_assets/Dragon_LOD3.bin",
+	L"lod_assets/Dragon_LOD4.bin",
+	L"lod_assets/Dragon_LOD5.bin",
 };
 
 const wchar_t* c_ampShaderFilename = L"shaders/MeshletAS.cso";
