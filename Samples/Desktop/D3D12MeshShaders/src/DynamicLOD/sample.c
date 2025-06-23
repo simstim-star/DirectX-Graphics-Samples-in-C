@@ -136,7 +136,7 @@ void Sample_Update(DXSample* const sample) {
 
 	SimpleCamera_Update(&sample->camera, TicksToSeconds(sample->timer.elapsedTicks));
 	XMMATRIX viewMatrix = SimpleCamera_GetViewMatrix(sample->camera.position, sample->camera.lookDirection, sample->camera.upDirection);
-	XMMATRIX projMatrix = SimpleCamera_GetProjectionMatrix(c_fovy, sample->aspectRatio, 1.0f, 1000.0f);
+	XMMATRIX projMatrix = SimpleCamera_GetProjectionMatrix(c_fovy, sample->aspectRatio, 1.0f, 1e4f);
 	XMMATRIX viewProj = XM_MAT_MULT(viewMatrix, projMatrix);
 	XMVECTOR scale, rot, viewPos;
 	XM_MAT_DECOMP(&scale, &rot, &viewPos, viewMatrix);
