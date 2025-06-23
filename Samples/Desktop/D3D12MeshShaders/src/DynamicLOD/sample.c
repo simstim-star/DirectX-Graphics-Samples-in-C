@@ -56,13 +56,13 @@ static void WaitForGpu(DXSample* sample);
 static void PopulateCommandList(DXSample* const sample);
 static void ReleaseAll(DXSample* const sample);
 static void LoadShaderData(const WCHAR* const base, const WCHAR* const shaderRelativePath, UINT8** shaderData, UINT* shaderDataLen);
-D3D12_CPU_DESCRIPTOR_HANDLE OffsetDescHandle(D3D12_CPU_DESCRIPTOR_HANDLE srvHandle, uint32_t index, uint32_t srvDescriptorSize);
-void MoveToNextFrame(DXSample* sample);
-void RegenerateInstances(DXSample* sample);
-UINT64 InstanceBufferWidth(ID3D12Resource* instanceBuffer);
+static D3D12_CPU_DESCRIPTOR_HANDLE OffsetDescHandle(D3D12_CPU_DESCRIPTOR_HANDLE srvHandle, uint32_t index, uint32_t srvDescriptorSize);
+static void MoveToNextFrame(DXSample* sample);
+static void RegenerateInstances(DXSample* sample);
+static UINT64 InstanceBufferWidth(ID3D12Resource* instanceBuffer);
 
-UINT32 AlignU32(UINT32 size);
-UINT64  AlignU64(UINT64 size);
+static UINT32 AlignU32(UINT32 size);
+static UINT64  AlignU64(UINT64 size);
 
 /*************************************************************************************
  Public functions
@@ -813,7 +813,7 @@ static void LoadShaderData(const WCHAR* const base, const WCHAR* const shaderRel
 #define OFFSET_HANDLE(i) (D3D12_CPU_DESCRIPTOR_HANDLE){ .ptr = srvHandle.ptr + ((SIZE_T)i) * srvDescriptorSize}
 
 
-D3D12_CPU_DESCRIPTOR_HANDLE OffsetDescHandle(D3D12_CPU_DESCRIPTOR_HANDLE original, uint32_t index, uint32_t descSize) {
+static D3D12_CPU_DESCRIPTOR_HANDLE OffsetDescHandle(D3D12_CPU_DESCRIPTOR_HANDLE original, uint32_t index, uint32_t descSize) {
 	return (D3D12_CPU_DESCRIPTOR_HANDLE){ 
 		.ptr = original.ptr + ((SIZE_T)index) * descSize 
 	};
@@ -821,7 +821,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE OffsetDescHandle(D3D12_CPU_DESCRIPTOR_HANDLE origina
 
 // aligns a given UINT32 value to the D3D12 constant buffer alignment requirement,
 // rounding size up to the next multiple of alignment
-UINT32 AlignU32(UINT32 size) {
+static UINT32 AlignU32(UINT32 size) {
 	const UINT32 alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
 	const UINT32 alignedSize = (size + alignment - 1) & ~(alignment - 1);
 	return alignedSize;
@@ -829,7 +829,7 @@ UINT32 AlignU32(UINT32 size) {
 
 // aligns a given UINT64 value to the D3D12 constant buffer alignment requirement,
 // rounding size up to the next multiple of alignment
-UINT64  AlignU64(UINT64 size) {
+static UINT64  AlignU64(UINT64 size) {
 	const UINT64 alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
 	const UINT64 alignedSize = (size + alignment - 1) & ~(alignment - 1);
 	return alignedSize;
@@ -851,7 +851,7 @@ static void WaitForGpu(DXSample *sample)
 }
 
 // Prepare to render the next frame.
-void MoveToNextFrame(DXSample* sample)
+static void MoveToNextFrame(DXSample* sample)
 {
 	// Schedule a Signal command in the queue.
 	const UINT64 currentFenceValue = sample->fenceValues[sample->frameIndex];
@@ -873,7 +873,7 @@ void MoveToNextFrame(DXSample* sample)
 	sample->fenceValues[sample->frameIndex] = currentFenceValue + 1;
 }
 
-void RegenerateInstances(DXSample* sample)
+static void RegenerateInstances(DXSample* sample)
 {
 	sample->updateInstances = true;
 
@@ -948,13 +948,13 @@ void RegenerateInstances(DXSample* sample)
 }
 
 
-UINT64 InstanceBufferWidth(ID3D12Resource *instanceBuffer) {
+static UINT64 InstanceBufferWidth(ID3D12Resource *instanceBuffer) {
 	D3D12_RESOURCE_DESC resourceDesc;
 	ID3D12Resource_GetDesc(instanceBuffer, &resourceDesc);
 	return resourceDesc.Width;
 }
 
-void ReleaseAll(DXSample* const sample)
+static void ReleaseAll(DXSample* const sample)
 {
 	RELEASE(sample->swapChain);
 	RELEASE(sample->device);
@@ -964,7 +964,7 @@ void ReleaseAll(DXSample* const sample)
 	}
 	for (int i = 0; i < LodsCount; ++i) {
 		for (int j = 0; i < sample->lods[i].nMeshes; ++j) {
-			ReleaseMesh(&sample->lods[i].meshes[j]);
+			Mesh_Release(&sample->lods[i].meshes[j]);
 		}
 	}
 	RELEASE(sample->commandQueue);

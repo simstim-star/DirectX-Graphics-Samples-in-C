@@ -39,20 +39,10 @@ const uint32_t c_sizeMap[] =
 const uint32_t c_prolog = 'MSHL';
 
 /*****************************************************************
-    Utils functions
+    Private functions
 ******************************************************************/
 
-int DivRoundUp_int(int num, int denom)
-{
-    return (num + denom - 1) / denom;
-}
-
-uint32_t DivRoundUp_uint32(uint32_t num, uint32_t denom)
-{
-    return (num + denom - 1) / denom;
-}
-
-uint32_t GetFormatSize(DXGI_FORMAT format);
+static uint32_t GetFormatSize(DXGI_FORMAT format);
 
 /*****************************************************************************************************************************
   Mesh-related types definitions
@@ -135,7 +125,7 @@ uint32_t Mesh_GetVertexIndex(Span_uint8_t UniqueVertexIndices, uint32_t index, u
     return *((const uint16_t*)(addr));
 }
 
-void ReleaseMesh(Mesh* m)
+void Mesh_Release(Mesh* m)
 {
     for (int i = 0; i < m->numVerticesSpans; ++i) RELEASE(m->VertexResources[i]);
     RELEASE(m->IndexResource);
@@ -831,14 +821,18 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
     return S_OK;
 }
 
-uint32_t GetFormatSize(DXGI_FORMAT format)
+/*****************************************************************
+    Private functions
+******************************************************************/
+
+static uint32_t GetFormatSize(DXGI_FORMAT format)
 {
     switch (format)
     {
-    case DXGI_FORMAT_R32G32B32A32_FLOAT: return 16;
-    case DXGI_FORMAT_R32G32B32_FLOAT: return 12;
-    case DXGI_FORMAT_R32G32_FLOAT: return 8;
-    case DXGI_FORMAT_R32_FLOAT: return 4;
+        case DXGI_FORMAT_R32G32B32A32_FLOAT: return 16;
+        case DXGI_FORMAT_R32G32B32_FLOAT: return 12;
+        case DXGI_FORMAT_R32G32_FLOAT: return 8;
+        case DXGI_FORMAT_R32_FLOAT: return 4;
     }
     return 0;
 }

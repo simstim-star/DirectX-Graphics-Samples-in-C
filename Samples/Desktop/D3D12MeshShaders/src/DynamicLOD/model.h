@@ -5,9 +5,6 @@
 #include "span.h"
 #include <DirectXCollisionC.h>
 
-// put it into a helper somewhere
-uint32_t DivRoundUp_uint32(uint32_t num, uint32_t denom);
-
 /*****************************************************************************************************************************
  >> Constants 
 ******************************************************************************************************************************/
@@ -176,7 +173,7 @@ typedef struct Mesh
     ID3D12Resource*              MeshInfoResource;
 } Mesh;
 
-void ReleaseMesh(Mesh* m);
+void Mesh_Release(Mesh* m);
 
 
 /*************************************************************************************************************

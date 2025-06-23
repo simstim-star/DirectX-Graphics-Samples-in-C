@@ -152,3 +152,13 @@ HRESULT ReadDataFromFile(LPCWSTR filename, byte** data, UINT* size)
 
 	return S_OK;
 }
+
+int DivRoundUp_int(int num, int denom)
+{
+	return (num + denom - 1) / denom;
+}
+
+uint32_t DivRoundUp_uint32(uint32_t num, uint32_t denom)
+{
+	return (num + denom - 1) / denom;
+}
