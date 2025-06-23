@@ -139,7 +139,7 @@ void Sample_Update(DXSample* const sample) {
 	XMMATRIX projMatrix = SimpleCamera_GetProjectionMatrix(c_fovy, sample->aspectRatio, 1.0f, 1000.0f);
 	XMMATRIX viewProj = XM_MAT_MULT(viewMatrix, projMatrix);
 	XMVECTOR scale, rot, viewPos;
-	XM_MAT_DECOMP(&scale, &rot, &viewPos, viewProj);
+	XM_MAT_DECOMP(&scale, &rot, &viewPos, viewMatrix);
 
 	XMMATRIX vp = XM_MAT_TRANSP(viewProj);
 	XMVECTOR leftPlane = XM_VEC_ADD(vp.r[3], vp.r[0]);
@@ -158,11 +158,11 @@ void Sample_Update(DXSample* const sample) {
 	};
 
 	Constants* constants = &sample->constantData[sample->frameIndex];
-	XMMATRIX transposedView = XM_MAT_TRANSP(viewProj);
+	XMMATRIX transposedView = XM_MAT_TRANSP(viewMatrix);
 	XM_STORE_FLOAT4X4(&constants->View, transposedView);
 	viewProj = XM_MAT_TRANSP(viewProj);
 	XM_STORE_FLOAT4X4(&constants->ViewProj, viewProj);
-	XMMATRIX viewProjInv = XM_MAT_INV(NULL, viewProj);
+	XMMATRIX viewProjInv = XM_MAT_INV(NULL, viewMatrix);
 	XMVECTOR baseToView = XM_VEC3_TRANSFORM(g_XMZero.v, viewProjInv);
 	XM_STORE_FLOAT3(&constants->ViewPosition, baseToView);
 
