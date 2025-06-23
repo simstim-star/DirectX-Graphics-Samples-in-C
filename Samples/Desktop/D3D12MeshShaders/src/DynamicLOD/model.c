@@ -10,8 +10,6 @@
 #include "sample_commons.h"
 #include "dxheaders/barrier_helpers.h"
 
-#include <dxgi1_6.h> // for macros to work, remove when add the ifdef __dxgi1_6_h__ on macros
-
 #include "DirectXCollisionC.h"
 
 /*****************************************************************
@@ -803,7 +801,7 @@ HRESULT Model_UploadGpuResources(Model *model, ID3D12Device2* device, ID3D12Comm
 
         // Create our sync fence
         ID3D12Fence *fence;
-        hr = ID3D12Device_CreateFence(device, 0, D3D12_FENCE_FLAG_NONE, IID(&fence), (void**)&fence);
+        hr = ID3D12Device_CreateFence(device, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, (void**)&fence);
         if (FAILED(hr)) LogErrAndExit(hr);
 
         ID3D12CommandQueue_Signal(cmdQueue, fence, 1);

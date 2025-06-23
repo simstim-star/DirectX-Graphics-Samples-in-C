@@ -58,9 +58,9 @@ typedef struct PackedTriangle
 
 typedef struct CullData
 {
-    XMFLOAT4          BoundingSphere; // xyz = center, w = radius
-    uint8_t           NormalCone[4];  // xyz = axis, w = -cos(a + 90)
-    float             ApexOffset;     // apex = center - axis * offset
+    XMFLOAT4 BoundingSphere; // xyz = center, w = radius
+    uint8_t  NormalCone[4];  // xyz = axis, w = -cos(a + 90)
+    float    ApexOffset;     // apex = center - axis * offset
 } CullData;
 
 
@@ -128,8 +128,7 @@ typedef struct Mesh
                                                // in D3D12_VERTEX_BUFFER_VIEW, the SizeInBytes is calculated as VertexCount * VertexStride (if interleaved)
 
 
-    // TODO create your own boundingsphere
-    XMBoundingSphere    BoundingSphere;
+    XMBoundingSphere          BoundingSphere;
 
     /********************************************************************************************************************
     *                                               Indices                                                             *
@@ -214,7 +213,7 @@ typedef struct Model {
 
 
 /*****************************************************************************************************************************
- * Model_LoadFromFile function loads a 3D model from a binary file specified by `filename`.                                  *
+ * Model_LoadFromFile function loads a 3D model from a binary file.                                                          *
  *                                                                                                                           *
  * The file format starts with the `FileHeader`, which contains:                                                             *
  *   - Prolog: A magic number used to identify the file as a valid model file.                                               *
