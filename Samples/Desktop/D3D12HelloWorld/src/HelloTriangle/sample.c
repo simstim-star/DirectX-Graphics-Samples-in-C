@@ -50,10 +50,13 @@ void Sample_Render(DXSample* const sample)
 	ID3D12CommandList* asCommandList = NULL;
 	CAST(sample->commandList, asCommandList);
 	ID3D12CommandList* ppCommandLists[] = { asCommandList };
-	CALL(ExecuteCommandLists, sample->commandQueue, _countof(ppCommandLists), ppCommandLists);
+	sample->commandQueue->lpVtbl->ExecuteCommandLists(sample->commandQueue, _countof(ppCommandLists), ppCommandLists);
 	RELEASE(asCommandList);
 
-	ExitIfFailed(CALL(Present, sample->swapChain, 1, 0));
+	ExitIfFailed(sample->swapChain
+		->lpVtbl
+		->Present(sample->swapChain, 1, 0)
+	);
 	WaitForPreviousFrame(sample);
 }
 
@@ -70,7 +73,7 @@ static void LoadPipeline(DXSample* const sample)
 	ID3D12Debug* debugController = NULL;
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
 	{
-		CALL(EnableDebugLayer, debugController);
+		debugController->lpVtbl->EnableDebugLayer(debugController);
 		isDebugFactory |= DXGI_CREATE_FACTORY_DEBUG;
 		RELEASE(debugController);
 	}
@@ -99,7 +102,10 @@ static void LoadPipeline(DXSample* const sample)
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	ID3D12CommandQueue* commandQueue = NULL;
-	ExitIfFailed(CALL(CreateCommandQueue, sample->device, &queueDesc, IID_PPV_ARGS(&sample->commandQueue)));
+	ExitIfFailed(sample->device
+		->lpVtbl
+		->CreateCommandQueue(sample->device, &queueDesc, IID_PPV_ARGS(&sample->commandQueue))
+	);
 
 	/* Create swap chain */
 
@@ -115,7 +121,7 @@ static void LoadPipeline(DXSample* const sample)
 	IUnknown* commandQueueAsIUnknown = NULL;
 	ExitIfFailed(CAST(sample->commandQueue, commandQueueAsIUnknown));
 	IDXGISwapChain1* swapChainAsSwapChain1 = NULL;
-	ExitIfFailed(CALL(CreateSwapChainForHwnd, 
+	ExitIfFailed(factory->lpVtbl->CreateSwapChainForHwnd(
 		factory,
 		commandQueueAsIUnknown,        // Swap chain needs the queue so that it can force a flush on it
 		G_HWND,
@@ -127,8 +133,11 @@ static void LoadPipeline(DXSample* const sample)
 	RELEASE(commandQueueAsIUnknown);
 	ExitIfFailed(CAST(swapChainAsSwapChain1, sample->swapChain));
 	RELEASE(swapChainAsSwapChain1);
-	ExitIfFailed(CALL(MakeWindowAssociation, factory, G_HWND, DXGI_MWA_NO_ALT_ENTER));
-	sample->frameIndex = CALL(GetCurrentBackBufferIndex, sample->swapChain);
+	ExitIfFailed(factory
+		->lpVtbl
+		->MakeWindowAssociation(factory, G_HWND, DXGI_MWA_NO_ALT_ENTER)
+	);
+	sample->frameIndex = sample->swapChain->lpVtbl->GetCurrentBackBufferIndex(sample->swapChain);
 
 	/* Create descriptor heaps (only 2 RTVs in this example) */
 	{
@@ -136,26 +145,35 @@ static void LoadPipeline(DXSample* const sample)
 		rtvHeapDesc.NumDescriptors = FrameCount;
 		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		ExitIfFailed(CALL(CreateDescriptorHeap, sample->device, &rtvHeapDesc, IID_PPV_ARGS(&sample->rtvHeap)));
-		sample->rtvDescriptorSize = CALL(GetDescriptorHandleIncrementSize, sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		ExitIfFailed(sample->device
+			->lpVtbl
+			->CreateDescriptorHeap(sample->device, &rtvHeapDesc, IID_PPV_ARGS(&sample->rtvHeap))
+		);
+		sample->rtvDescriptorSize = sample->device->lpVtbl->GetDescriptorHandleIncrementSize(sample->device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
 	/* Create frame resources on the descriptor heaps above */
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
-		CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvHandle);
+		sample->rtvHeap->lpVtbl->GetCPUDescriptorHandleForHeapStart(sample->rtvHeap, &rtvHandle);
 		// Create a RTV for each frame.
 		for (UINT nthSwapChainBuffer = 0; nthSwapChainBuffer < FrameCount; nthSwapChainBuffer++)
 		{
 			// set resource at renderTargets[nthSwapChainBuffer] as the nth-SwapChainBuffer
-			ExitIfFailed(CALL(GetBuffer, sample->swapChain, nthSwapChainBuffer, IID_PPV_ARGS(&sample->renderTargets[nthSwapChainBuffer])));
+			ExitIfFailed(sample->swapChain
+				->lpVtbl
+				->GetBuffer(sample->swapChain, nthSwapChainBuffer, IID_PPV_ARGS(&sample->renderTargets[nthSwapChainBuffer]))
+			);
 			// create a RTV on the heap related to the handle
-			CALL(CreateRenderTargetView, sample->device, sample->renderTargets[nthSwapChainBuffer], NULL, rtvHandle);
+			sample->device->lpVtbl->CreateRenderTargetView(sample->device, sample->renderTargets[nthSwapChainBuffer], NULL, rtvHandle);
 			// walk an offset equivalent to one descriptor to go to next space to store the next RTV
 			rtvHandle.ptr = (SIZE_T)((INT64)(rtvHandle.ptr) + (INT64)(sample->rtvDescriptorSize));
 		}
 	}
-	ExitIfFailed(CALL(CreateCommandAllocator, sample->device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&sample->commandAllocator)));
+	ExitIfFailed(sample->device
+		->lpVtbl
+		->CreateCommandAllocator(sample->device, D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&sample->commandAllocator))
+	);
 	RELEASE(factory);
 }
 
@@ -176,9 +194,12 @@ static void LoadAssets(DXSample* const sample)
 		ID3DBlob* signature = NULL;
 		ID3DBlob* error = NULL;
 		ExitIfFailed(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-		const LPVOID bufferPointer = CALL(GetBufferPointer, signature);
-		const SIZE_T bufferSize = CALL(GetBufferSize, signature);
-		ExitIfFailed(CALL(CreateRootSignature, sample->device, 0, bufferPointer, bufferSize, IID_PPV_ARGS(&sample->rootSignature)));
+		const LPVOID bufferPointer = signature->lpVtbl->GetBufferPointer(signature);
+		const SIZE_T bufferSize = signature->lpVtbl->GetBufferSize(signature);
+		ExitIfFailed(sample->device
+			->lpVtbl
+			->CreateRootSignature(sample->device, 0, bufferPointer, bufferSize, IID_PPV_ARGS(&sample->rootSignature))
+		);
 	}
 	
 	/* Create the pipeline state, which includes compiling and loading shaders */
@@ -217,12 +238,12 @@ static void LoadAssets(DXSample* const sample)
 			.NumElements = _countof(inputElementDescs)
 		};
 		psoDesc.VS = (D3D12_SHADER_BYTECODE){
-			.pShaderBytecode = CALL(GetBufferPointer, vertexShader),
-			.BytecodeLength = CALL(GetBufferSize, vertexShader),
+			.pShaderBytecode = vertexShader->lpVtbl->GetBufferPointer(vertexShader),
+			.BytecodeLength = vertexShader->lpVtbl->GetBufferSize(vertexShader),
 		};
 		psoDesc.PS = (D3D12_SHADER_BYTECODE){
-			.pShaderBytecode = CALL(GetBufferPointer, pixelShader),
-			.BytecodeLength = CALL(GetBufferSize, pixelShader),
+			.pShaderBytecode = pixelShader->lpVtbl->GetBufferPointer(pixelShader),
+			.BytecodeLength = pixelShader->lpVtbl->GetBufferSize(pixelShader),
 		};
 		psoDesc.RasterizerState = CD3DX12_DEFAULT_RASTERIZER_DESC();
 		psoDesc.BlendState = CD3DX12_DEFAULT_BLEND_DESC();
@@ -233,15 +254,25 @@ static void LoadAssets(DXSample* const sample)
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
-		ExitIfFailed(CALL(CreateGraphicsPipelineState, sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState)));
+		ExitIfFailed(sample->device
+			->lpVtbl
+			->CreateGraphicsPipelineState(sample->device, &psoDesc, IID_PPV_ARGS(&sample->pipelineState))
+		);
 	}
 
 	/* Create the command list */
 
-	ExitIfFailed(CALL(CreateCommandList, sample->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, sample->commandAllocator, sample->pipelineState, IID_PPV_ARGS(&sample->commandList)));
+	ExitIfFailed(sample->device
+		->lpVtbl
+		->CreateCommandList(sample->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, sample->commandAllocator, sample->pipelineState, 
+			IID_PPV_ARGS(&sample->commandList))
+	);
 	// Command lists are created in the recording state, but there is nothing
 	// to record yet. The main loop expects it to be closed, so close it now
-	ExitIfFailed(CALL(Close, sample->commandList));
+	ExitIfFailed(sample->commandList
+		->lpVtbl
+		->Close(sample->commandList)
+	);
 
 	/* Create the vertex buffer, populate it and set a view to it */
 	{
@@ -266,13 +297,17 @@ static void LoadAssets(DXSample* const sample)
 		// recommended. Every time the GPU needs it, the upload heap will be marshalled 
 		// over. Please read up on Default Heap usage. An upload heap is used here for 
 		// code simplicity and because there are very few verts to actually transfer
-		ExitIfFailed(CALL(CreateCommittedResource, sample->device,
-			&heapPropertyUpload,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferResource,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			NULL,
-			IID_PPV_ARGS(&sample->vertexBuffer)));
+		ExitIfFailed(sample->device
+			->lpVtbl
+			->CreateCommittedResource(
+				sample->device,
+				&heapPropertyUpload,
+				D3D12_HEAP_FLAG_NONE,
+				&bufferResource,
+				D3D12_RESOURCE_STATE_GENERIC_READ,
+				NULL,
+				IID_PPV_ARGS(&sample->vertexBuffer))
+		);
 
 		// We will open the vertexBuffer memory (that is in the GPU) for the CPU to write the triangle data 
 		// in it. To do that, we use the Map() function, which enables the CPU to read from or write 
@@ -280,21 +315,27 @@ static void LoadAssets(DXSample* const sample)
 		UINT8* pVertexDataBegin = NULL; // UINT8 to represent byte-level manipulation
 		// We do not intend to read from this resource on the CPU, only write
 		const D3D12_RANGE readRange = (D3D12_RANGE){ .Begin = 0, .End = 0 };
-		ExitIfFailed(CALL(Map, sample->vertexBuffer, 0, &readRange, (void**)(&pVertexDataBegin)));
+		ExitIfFailed(sample->vertexBuffer
+			->lpVtbl
+			->Map( sample->vertexBuffer, 0, &readRange, &pVertexDataBegin)
+		);
 		memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
 		// While mapped, the GPU cannot access the buffer, so it's important to minimize the time 
 		// the buffer is mapped.
-		CALL(Unmap, sample->vertexBuffer, 0, NULL);
+		sample->vertexBuffer->lpVtbl->Unmap(sample->vertexBuffer, 0, NULL);
 
 		// Initialize the vertex buffer view
-		sample->vertexBufferView.BufferLocation = CALL(GetGPUVirtualAddress, sample->vertexBuffer);
+		sample->vertexBufferView.BufferLocation = sample->vertexBuffer->lpVtbl->GetGPUVirtualAddress(sample->vertexBuffer);
 		sample->vertexBufferView.StrideInBytes = sizeof(Vertex);
 		sample->vertexBufferView.SizeInBytes = vertexBufferSize;
 	}
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU
 	{
-		ExitIfFailed(CALL(CreateFence, sample->device, 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&sample->fence)));
+		ExitIfFailed(sample->device
+			->lpVtbl
+			->CreateFence(sample->device, 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&sample->fence))
+		);
 		sample->fenceValue = 1;
 
 		// Create an event handle to use for frame synchronization
@@ -319,15 +360,18 @@ static void LoadAssets(DXSample* const sample)
 static void WaitForPreviousFrame(DXSample* const sample)
 {
 	// Signal to the fence the current fenceValue
-	ExitIfFailed(CALL(Signal, sample->commandQueue, sample->fence, sample->fenceValue));
+	ExitIfFailed(sample->commandQueue
+		->lpVtbl
+		->Signal(sample->commandQueue, sample->fence, sample->fenceValue)
+	);
 	// Wait until the frame is finished (ie. reached the signal sent right above) 
-	if (CALL(GetCompletedValue, sample->fence) < sample->fenceValue)
+	if (sample->fence->lpVtbl->GetCompletedValue(sample->fence) < sample->fenceValue)
 	{
-		ExitIfFailed(CALL(SetEventOnCompletion, sample->fence, sample->fenceValue, sample->fenceEvent));
+		ExitIfFailed(sample->fence->lpVtbl->SetEventOnCompletion(sample->fence, sample->fenceValue, sample->fenceEvent));
 		WaitForSingleObject(sample->fenceEvent, INFINITE);
 	}
 	sample->fenceValue++;
-	sample->frameIndex = CALL(GetCurrentBackBufferIndex, sample->swapChain);
+	sample->frameIndex = sample->swapChain->lpVtbl->GetCurrentBackBufferIndex(sample->swapChain);
 }
 
 // Record all the commands we need to render the scene into the command list
@@ -336,17 +380,20 @@ static void PopulateCommandList(DXSample* const sample)
 	// Command list allocators can only be reset when the associated 
 	// command lists have finished execution on the GPU; apps should use 
 	// fences to determine GPU execution progress
-	ExitIfFailed(CALL(Reset, sample->commandAllocator));
+	ExitIfFailed(sample->commandAllocator->lpVtbl->Reset(sample->commandAllocator));
 
 	// However, when ExecuteCommandList() is called on a particular command 
 	// list, that command list can then be reset at any time and must be before 
 	// re-recording
-	ExitIfFailed(CALL(Reset, sample->commandList, sample->commandAllocator, sample->pipelineState));
+	ExitIfFailed(sample->commandList
+		->lpVtbl
+		->Reset(sample->commandList, sample->commandAllocator, sample->pipelineState)
+	);
 
 	// Set necessary state
-	CALL(SetGraphicsRootSignature, sample->commandList, sample->rootSignature);
-	CALL(RSSetViewports, sample->commandList, 1, &sample->viewport);
-	CALL(RSSetScissorRects, sample->commandList, 1, &sample->scissorRect);
+	sample->commandList->lpVtbl->SetGraphicsRootSignature(sample->commandList, sample->rootSignature);
+	sample->commandList->lpVtbl->RSSetViewports(sample->commandList, 1, & sample->viewport);
+	sample->commandList->lpVtbl->RSSetScissorRects(sample->commandList, 1, &sample->scissorRect);
 
 	// Indicate that the back buffer will be used as a render target
 	const D3D12_RESOURCE_BARRIER transitionBarrierRT = CD3DX12_Transition(sample->renderTargets[sample->frameIndex],
@@ -354,20 +401,27 @@ static void PopulateCommandList(DXSample* const sample)
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 		D3D12_RESOURCE_BARRIER_FLAG_NONE);
-	CALL(ResourceBarrier, sample->commandList, 1, &transitionBarrierRT);
+	sample->commandList
+		->lpVtbl
+		->ResourceBarrier(sample->commandList, 1, &transitionBarrierRT);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle;
-	CALL(GetCPUDescriptorHandleForHeapStart, sample->rtvHeap, &rtvHandle);
+	sample->rtvHeap
+		->lpVtbl
+		->GetCPUDescriptorHandleForHeapStart(sample->rtvHeap, &rtvHandle);
 	const INT64 CurrentRtvOffset = sample->frameIndex * sample->rtvDescriptorSize;
 	rtvHandle.ptr = (SIZE_T)((INT64)(rtvHandle.ptr) + CurrentRtvOffset);
-	CALL(OMSetRenderTargets, sample->commandList, 1, &rtvHandle, FALSE, NULL);
+	
+	sample->commandList
+		->lpVtbl
+		->OMSetRenderTargets(sample->commandList, 1, &rtvHandle, FALSE, NULL);
 
 	// Record commands
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	CALL(ClearRenderTargetView, sample->commandList, rtvHandle, clearColor, 0, NULL);
-	CALL(IASetVertexBuffers, sample->commandList, 0, 1, &sample->vertexBufferView);
-	CALL(IASetPrimitiveTopology, sample->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	CALL(DrawInstanced, sample->commandList, 3, 1, 0, 0);
+	sample->commandList->lpVtbl->ClearRenderTargetView(sample->commandList, rtvHandle, clearColor, 0, NULL);
+	sample->commandList->lpVtbl->IASetVertexBuffers(sample->commandList, 0, 1, & sample->vertexBufferView);
+	sample->commandList->lpVtbl->IASetPrimitiveTopology(sample->commandList, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	sample->commandList->lpVtbl->DrawInstanced(sample->commandList, 3, 1, 0, 0);
 
 	D3D12_RESOURCE_BARRIER transitionBarrierPresent = CD3DX12_Transition(sample->renderTargets[sample->frameIndex],
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
@@ -376,8 +430,11 @@ static void PopulateCommandList(DXSample* const sample)
 		D3D12_RESOURCE_BARRIER_FLAG_NONE);
 	
 	// Indicate that the back buffer will now be used to present
-	CALL(ResourceBarrier, sample->commandList, 1, &transitionBarrierPresent);
-	ExitIfFailed(CALL(Close, sample->commandList));
+	sample->commandList->lpVtbl->ResourceBarrier(sample->commandList, 1, &transitionBarrierPresent);
+	ExitIfFailed(sample->commandList
+		->lpVtbl
+		->Close(sample->commandList)
+	);
 }
 
 void ReleaseAll(DXSample* const sample)
