@@ -54,11 +54,11 @@ void GetHardwareAdapter(
 	{
 		DXGI_GPU_PREFERENCE gpuPreference = requestHighPerformanceAdapter ? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED;
 		for (UINT adapterIndex = 0;
-			SUCCEEDED(CALL(EnumAdapterByGpuPreference, factory6, adapterIndex, gpuPreference, IID_PPV_ARGS(&adapter)));
+			SUCCEEDED(factory6->lpVtbl->EnumAdapterByGpuPreference(factory6, adapterIndex, gpuPreference, IID_PPV_ARGS(&adapter)));
 			++adapterIndex)
 		{
 			DXGI_ADAPTER_DESC1 desc;
-			CALL(GetDesc1, adapter, &desc);
+			adapter->lpVtbl->GetDesc1(adapter, &desc);
 			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
 			{
 				// Don't select the Software adapter
@@ -80,10 +80,10 @@ void GetHardwareAdapter(
 	// Will enter here if your factory can't query a Factory6
 	if (adapter == NULL)
 	{
-		for (UINT adapterIndex = 0; SUCCEEDED(CALL(EnumAdapters1, pFactory, adapterIndex, &adapter)); ++adapterIndex)
+		for (UINT adapterIndex = 0; SUCCEEDED(pFactory->lpVtbl->EnumAdapters1(pFactory, adapterIndex, &adapter)); ++adapterIndex)
 		{
 			DXGI_ADAPTER_DESC1 desc;
-			CALL(GetDesc1, adapter, &desc);
+			adapter->lpVtbl->GetDesc1(adapter, &desc);
 			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
 			{
 				// Don't select the Basic Render Driver adapter.
